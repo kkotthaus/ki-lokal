@@ -1,4 +1,4 @@
-# ki-lokal
+﻿# ki-lokal
 
 Lokale KI-Werkzeuge für die Webseiten-Entwicklung auf der RTX 5070 Ti (16 GB).
 Alles liegt unter `D:\Projekte-KI`. Dieses Repo enthält nur Skripte, Workflows
@@ -26,8 +26,15 @@ cd ki-lokal
 powershell -ExecutionPolicy Bypass -File .\setup.ps1
 ```
 
-Danach ComfyUI Desktop installieren (https://www.comfy.org/download) und als
-Speicherort `D:\Projekte-KI\ComfyUI` wählen.
+Danach ComfyUI Desktop installieren (https://www.comfy.org/download), einmal
+starten und wieder komplett beenden. Dann die Modell-, Eingabe- und Ausgabeordner
+nach D: verknüpfen:
+
+```powershell
+.\scripts\comfy-verknuepfen.ps1
+```
+
+Prüfen bei laufendem ComfyUI: `curl.exe http://127.0.0.1:8188/models/checkpoints`
 
 ## Benötigte Modelle (nicht im Repo)
 
@@ -42,3 +49,4 @@ Speicherort `D:\Projekte-KI\ComfyUI` wählen.
 - `scripts/comfy/` – ComfyUI-Workflows (API-Export) und Skripte dafür
 - `scripts/blender/` – Blender-Python-Skripte
 - `vorlagen/webprojekt/` – CLAUDE.md für neue Webprojekte
+

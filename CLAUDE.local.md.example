@@ -1,6 +1,7 @@
-# Lokale Einstellungen für diesen Rechner (nicht im Git)
+﻿# Lokale Einstellungen fÃ¼r diesen Rechner (nicht im Git)
 # Kopie als CLAUDE.local.md anlegen (macht setup.ps1 automatisch) und anpassen.
 
-- ComfyUI-API: http://127.0.0.1:8000
+- ComfyUI-API: http://127.0.0.1:8188
 - ComfyUI-Datenordner: D:\Projekte-KI\ComfyUI
 - Grafikkarte: RTX 5070 Ti, 16 GB VRAM
+
