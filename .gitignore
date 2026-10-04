@@ -1,0 +1,25 @@
+# Abhängigkeiten
+node_modules/
+
+# Lokale Einstellungen (nur dieser Rechner)
+CLAUDE.local.md
+.claude/settings.local.json
+.env
+
+# Modelle und große Dateien, falls versehentlich hier abgelegt
+*.safetensors
+*.ckpt
+*.pth
+*.onnx
+*.gguf
+
+# Medien und Ausgaben
+*.mp4
+*.mov
+*.blend1
+output/
+renders/
+
+# System
+Thumbs.db
+.DS_Store
