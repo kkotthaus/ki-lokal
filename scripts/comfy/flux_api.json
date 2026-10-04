@@ -1,0 +1,51 @@
+{
+  "3": {
+    "class_type": "KSampler",
+    "_meta": { "title": "KSampler" },
+    "inputs": {
+      "seed": 42,
+      "steps": 4,
+      "cfg": 1.0,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "denoise": 1.0,
+      "model": ["4", 0],
+      "positive": ["6", 0],
+      "negative": ["7", 0],
+      "latent_image": ["5", 0]
+    }
+  },
+  "4": {
+    "class_type": "CheckpointLoaderSimple",
+    "_meta": { "title": "Load Checkpoint" },
+    "inputs": { "ckpt_name": "flux1-schnell-fp8.safetensors" }
+  },
+  "5": {
+    "class_type": "EmptySD3LatentImage",
+    "_meta": { "title": "Bildgroesse" },
+    "inputs": { "width": 1344, "height": 768, "batch_size": 1 }
+  },
+  "6": {
+    "class_type": "CLIPTextEncode",
+    "_meta": { "title": "Positiver Prompt" },
+    "inputs": {
+      "text": "modern bright office with plants, morning light, professional photography",
+      "clip": ["4", 1]
+    }
+  },
+  "7": {
+    "class_type": "CLIPTextEncode",
+    "_meta": { "title": "Negativer Prompt (bei Flux ohne Wirkung)" },
+    "inputs": { "text": "", "clip": ["4", 1] }
+  },
+  "8": {
+    "class_type": "VAEDecode",
+    "_meta": { "title": "VAE Decode" },
+    "inputs": { "samples": ["3", 0], "vae": ["4", 2] }
+  },
+  "9": {
+    "class_type": "SaveImage",
+    "_meta": { "title": "Speichern" },
+    "inputs": { "filename_prefix": "ki-lokal", "images": ["8", 0] }
+  }
+}

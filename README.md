@@ -47,6 +47,8 @@ Prüfen bei laufendem ComfyUI: `curl.exe http://127.0.0.1:8188/models/checkpoint
 
 - `scripts/optimize-images.mjs` – Bilder in AVIF + WebP, 640/1280/1920 px
 - `scripts/comfy/` – ComfyUI-Workflows (API-Export) und Skripte dafür
+- `scripts/comfy/generate.py` – Text-zu-Bild mit FLUX.1 schnell über die ComfyUI-API,
+  speichert nach `medien\raw\<name>-<nummer>.png`
 - `scripts/blender/` – Blender-Python-Skripte
 - `vorlagen/webprojekt/` – CLAUDE.md für neue Webprojekte
 
