@@ -44,7 +44,8 @@ Fasse in zwei Sätzen zusammen, welche Farben und welche Anmutung du verwendest,
 - Ausgabe: D:/Projekte-KI/medien/renders/<projekt>/<motiv>-preview.png
 
 ### KI-Bild (FLUX)
-- Prüfen, ob ComfyUI erreichbar ist (Port aus CLAUDE.local.md). Wenn nicht: Nutzer bitten, ComfyUI zu starten, und warten.
+- ComfyUI starten bzw. prüfen: pwsh -NoProfile -File D:/Projekte-KI/ki-lokal/scripts/comfy/start.ps1 (startet den Server im Hintergrund, wenn die API nicht antwortet; läuft er schon, passiert nichts). Scheitert der Start: Fehler zeigen und Nutzer fragen.
+- Wenn keine weiteren Bilder anstehen: pwsh -NoProfile -File D:/Projekte-KI/ki-lokal/scripts/comfy/stop.ps1 (beendet nur einen von start.ps1 gestarteten Server).
 - Englischen Prompt formulieren und kurz zeigen.
 - python D:/Projekte-KI/ki-lokal/scripts/comfy/generate.py --prompt "..." --count <n> --width .. --height .. --name <projekt>-<motiv>
 - Danach nach D:/Projekte-KI/medien/raw/<projekt>/ verschieben.

@@ -7,6 +7,20 @@ Hier liegen Workflows im API-Format (ComfyUI: Menü > Workflow > Export (API)).
 | flux_api.json | Text-zu-Bild mit FLUX.1 schnell |
 | rmbg_api.json | Hintergrund entfernen (noch exportieren) |
 
+## start.ps1 / stop.ps1
+
+`start.ps1` startet den ComfyUI-Server ohne ComfyUI Desktop im Hintergrund – mit dem
+Python der Desktop-Installation, den Modellen, `input` und `output` aus dem
+ComfyUI-Datenordner, Port 8188. Antwortet die API schon (auch aus der Desktop-App),
+passiert nichts. `stop.ps1` beendet nur den von `start.ps1` gestarteten Server.
+Protokoll und Prozessnummer in `%LOCALAPPDATA%\ki-lokal\`. `-Fenster` wartet am Ende
+auf Enter (für Verknüpfungen auf dem Desktop).
+
+```powershell
+.\scripts\comfy\start.ps1
+.\scripts\comfy\stop.ps1
+```
+
 Skripte, die Claude Code dafür schreibt (z. B. generate.py, remove_bg.py),
 ebenfalls hier ablegen. Port der API steht in CLAUDE.local.md.
 
