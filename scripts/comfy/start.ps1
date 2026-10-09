@@ -11,6 +11,9 @@ param(
     [string]$Daten        = "D:\Projekte-KI\ComfyUI",
     [int]$Port            = 8188,
     [int]$Wartezeit       = 180,
+    # Weitere Argumente fuer ComfyUI. DynamicVRAM (comfy-aimdo) bricht hier beim Laden von FLUX ab
+    # (Windows-Fehler 1450 beim Lesen der Modelldatei, 2026-10-09), deshalb standardmaessig aus.
+    [string]$Zusatz       = "--disable-dynamic-vram",
     [switch]$Fenster
 )
 
@@ -82,6 +85,7 @@ $argumente = @(
     '--output-directory', "`"$(Join-Path $Daten 'output')`"",
     '--input-directory', "`"$(Join-Path $Daten 'input')`""
 ) -join ' '
+if ($Zusatz) { $argumente += " $Zusatz" }
 
 $prozess = Start-Process -FilePath $python -ArgumentList $argumente -WorkingDirectory $Installation `
     -WindowStyle Hidden -RedirectStandardOutput $Log -RedirectStandardError "$Log.err" -PassThru

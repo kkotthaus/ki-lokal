@@ -15,6 +15,9 @@ ComfyUI-Datenordner, Port 8188. Antwortet die API schon (auch aus der Desktop-Ap
 passiert nichts. `stop.ps1` beendet nur den von `start.ps1` gestarteten Server.
 Protokoll und Prozessnummer in `%LOCALAPPDATA%\ki-lokal\`. `-Fenster` wartet am Ende
 auf Enter (für Verknüpfungen auf dem Desktop).
+Standardmäßig mit `--disable-dynamic-vram`: Mit DynamicVRAM (comfy-aimdo) bricht
+FLUX beim Laden ab (`hostbuf_file_reader_read failed`, Windows-Fehler 1450).
+Andere Argumente über `-Zusatz "..."`.
 
 ```powershell
 .\scripts\comfy\start.ps1
