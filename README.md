@@ -60,7 +60,8 @@ angeben; verbindlich klärt das nur eine juristische Prüfung.
   das Sprachmodell wählt Art (Bild/SVG) und Format und schreibt den englischen Prompt, FLUX erzeugt das Bild;
   bei SVG wird es nachgezeichnet (`scripts/vektor/svg.py`), mit Knopf „SVG-Code kopieren“. Jeder Klick ergibt eine neue Variante.
   **Farben von einer Website** (`app/lib/farben.mjs`): Adresse eingeben (auch Local-Seiten wie https://paas.local, die
-  Bildwerkstatt fragt sie am Platz 1 ab; bei Projekten wird die Seite aus `windows-dev/projekte.json` vorgeschlagen).
+  Bildwerkstatt fragt sie am Platz 1 ab). Ist ein Projekt gewählt, kommen die Farben automatisch von dessen Seite
+  laut `windows-dev/projekte.json`: lokal, sonst Staging, sonst Live – die erste erreichbare (je Projekt einmal geladen).
   Gelesen werden theme-color, Hauptfarben als CSS-Variablen (ACSS `--primary` usw., WordPress-Palette) und häufige Farben.
   Gewählte Farben gehen in den Prompt (Bild: ungefähr) und werden im SVG exakt gesetzt (`svg.py --palette`).
   **Logo einsetzen:** Logo als Datei ablegen oder über „Logo holen“ von der Website wählen (Kandidaten aus `<img>` mit

@@ -34,9 +34,9 @@ async function speichern() {
 async function projekte() {
   try {
     const d = JSON.parse(await readFile(path.join(PROJEKTE, 'windows-dev', 'projekte.json'), 'utf8'));
-    // seite: Adresse für „Farben von“ – die lokale Seite, sonst Staging oder Live
-    const seite = p => ['Lokal', 'Staging', 'Live'].map(u => (p.seiten || []).find(s => s.umgebung === u)?.adresse).find(Boolean) || '';
-    return d.projekte.map(p => ({ kurz: p.kurz, name: p.name, gruppe: p.gruppe || '', seite: seite(p) }));
+    // seiten: Adressen für Farben und Logo in dieser Reihenfolge – lokal, Staging, Live
+    const seiten = p => ['Lokal', 'Staging', 'Live'].map(u => (p.seiten || []).find(s => s.umgebung === u)?.adresse).filter(Boolean);
+    return d.projekte.map(p => ({ kurz: p.kurz, name: p.name, gruppe: p.gruppe || '', seite: seiten(p)[0] || '', seiten: seiten(p) }));
   } catch { return []; }
 }
 
@@ -393,7 +393,18 @@ const routen = {
   },
 
   // Farben einer Website (auch *.local) auslesen
-  'POST /api/farben': async (_, b) => farben.vonWebsite(String(JSON.parse(b).url || '').trim()),
+  // Mit { projekt }: die Seiten des Projekts der Reihe nach probieren (lokal, Staging, Live), erste erreichbare zählt
+  'POST /api/farben': async (_, b) => {
+    const { url, projekt } = JSON.parse(b);
+    if (!projekt) return farben.vonWebsite(String(url || '').trim());
+    const seiten = (await projekte()).find(p => p.kurz === projekt)?.seiten || [];
+    if (!seiten.length) throw new Error(`Für ${projekt} ist keine Website in projekte.json eingetragen.`);
+    const fehler = [];
+    for (const s of seiten) {
+      try { return await farben.vonWebsite(s); } catch (e) { fehler.push(e.message); }
+    }
+    throw new Error(`Keine Seite erreichbar: ${fehler.join('; ')}`);
+  },
 
   'POST /api/erstellen': (_, b) => nacheinander(async () => {
     const start = Date.now();

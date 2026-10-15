@@ -245,6 +245,33 @@ function zielZeigen(e, ziel) {
   const seite = e.modus === 'projekt' ? zustand.projekte.find(p => p.kurz === e.projekt)?.seite || '' : '';
   if (!$('#farbquelle').value || $('#farbquelle').value === zustand.farbquelleAuto) $('#farbquelle').value = seite;
   zustand.farbquelleAuto = seite;
+  projektFarben(e.modus === 'projekt' && seite ? e.projekt : '');
+}
+
+// Farben des gewählten Projekts automatisch holen (je Projekt einmal, danach aus dem Speicher)
+const projektCache = {};
+async function projektFarben(projekt) {
+  if (projekt === zustand.farbProjekt) return;
+  zustand.farbProjekt = projekt;
+  if (!projekt) return;
+  if (!projektCache[projekt]) {
+    const zeile = log(`Farben von ${projekt} …`, 'laeuft');
+    try {
+      const r = await api('/api/farben', { projekt });
+      projektCache[projekt] = r;
+      zeile.className = 'ok'; zeile.textContent = `Farben von ${projekt} übernommen (${r.url})`;
+    } catch (err) {
+      zeile.className = 'fehler'; zeile.textContent = `Farben von ${projekt}: ${err.message}`;
+      if (zustand.farbProjekt === projekt) zustand.farbProjekt = '';  // beim nächsten Wählen erneut versuchen (z. B. nach Start in Local)
+      return;
+    }
+  }
+  if (zustand.farbProjekt !== projekt) return;  // inzwischen anderes Projekt gewählt
+  const r = projektCache[projekt];
+  $('#farbquelle').value = zustand.farbquelleAuto = r.url;
+  zustand.farben = r.farben.map(f => ({ ...f, an: f.haupt }));
+  if (!zustand.farben.some(f => f.an)) zustand.farben.slice(0, 3).forEach(f => (f.an = true));
+  farbenZeigen();
 }
 
 async function einstellen(e) {
