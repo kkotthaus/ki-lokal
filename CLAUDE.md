@@ -21,6 +21,10 @@ Rechner-spezifische Werte (Port, Pfade) stehen in CLAUDE.local.md.
 - Blender ohne Oberfläche: blender -b datei.blend -P skript.py
 
 ## Regeln
+- Alle Grafiken auf der Grafikkarte erzeugen (Rendern, KI-Bilder, Freistellen, Videos): Blender
+  Cycles mit Device GPU/OptiX, ComfyUI auf CUDA, FFmpeg mit NVENC. Kein Ausweichen auf die CPU:
+  ist die GPU nicht verfügbar, abbrechen und melden. Neue Skripte prüfen das selbst
+  (Blender: OptiX-Gerät aktiv, ComfyUI: /system_stats meldet "cuda").
 - Neue Skripte nach scripts/ legen, kurz im README.md eintragen.
 - Keine Kundendaten, Zugangsdaten oder Mediendateien committen.
 - Vor großen Batch-Jobs (mehr als 20 Dateien oder mehr als 5 Minuten) bestätigen lassen.

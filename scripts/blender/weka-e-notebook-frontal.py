@@ -213,7 +213,10 @@ prefs.compute_device_type = 'OPTIX'
 prefs.get_devices()
 for dev in prefs.devices:
     dev.use = dev.type == 'OPTIX'
+if not any(dev.use for dev in prefs.devices):
+    raise SystemExit('Keine OptiX-Grafikkarte gefunden – Abbruch statt Rendern auf der CPU.')
 scene.cycles.device = 'GPU'
+scene.cycles.denoiser = 'OPTIX'
 scene.cycles.samples = 64 if A.preview else 256
 scene.cycles.use_denoising = True
 scene.render.film_transparent = True

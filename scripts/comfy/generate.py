@@ -126,7 +126,11 @@ def main():
     try:
         template = json.loads(WORKFLOW.read_text(encoding="utf-8"))
         sampler_id, positive_id, latent_id = find_nodes(template)
-        request(server=args.server, path="/system_stats", timeout=5)  # Erreichbarkeit früh prüfen
+        stats = json.loads(request(server=args.server, path="/system_stats", timeout=5))  # Erreichbarkeit früh prüfen
+        # Nur auf der Grafikkarte erzeugen: läuft ComfyUI auf der CPU, abbrechen statt langsam weiterzumachen
+        devices = [d.get("type") for d in stats.get("devices", [])]
+        if "cuda" not in devices:
+            raise ComfyError(f"ComfyUI läuft nicht auf der Grafikkarte (Geräte: {devices or 'keine'}). Abbruch.")
         OUT_DIR.mkdir(parents=True, exist_ok=True)
         client_id = str(uuid.uuid4())
         number = 1
