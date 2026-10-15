@@ -6,7 +6,7 @@ import { readFile, writeFile, mkdir, copyFile, rename, unlink, stat, access } fr
 import { execFile } from 'node:child_process';
 import path from 'node:path';
 import sharp from 'sharp';
-import { MEDIEN, PROJEKTE, STATUS, EINSTELLUNGEN, KI_LOKAL } from './lib/pfade.mjs';
+import { MEDIEN, PROJEKTE, STATUS, EINSTELLUNGEN, KI_LOKAL, COMFY_PYTHON } from './lib/pfade.mjs';
 import * as comfy from './lib/comfy.mjs';
 import * as sprachmodell from './lib/sprachmodell.mjs';
 import { webVarianten } from '../scripts/bilder-web.mjs';
@@ -109,6 +109,24 @@ async function schritt(datei, s) {
       const bild = sharp(datei).resize(w, h, { fit: 'cover', position: sharp.strategy.attention });
       await (png ? bild.png() : bild.jpeg({ quality: 92 })).toFile(ziel);
       return { datei: ziel, info: `zugeschnitten ${rw}:${rh} (${w}×${h} px)` };
+    }
+    case 'entfernen': {
+      // Maske kommt als PNG (weiß = entfernen) in Größe der Vorschau, das Skript skaliert sie aufs Bild
+      if (!s.maske?.startsWith('data:image/png;base64,')) throw new Error('Erst im Bild markieren, was weg soll.');
+      const maske = path.join(STATUS, `maske-${Date.now()}.png`);
+      await mkdir(STATUS, { recursive: true });
+      await writeFile(maske, Buffer.from(s.maske.split(',')[1], 'base64'));
+      const ziel = await freierName(ordner, `${basis}-entfernt`, meta.hasAlpha || meta.format === 'png' ? '.png' : '.jpg');
+      const roh = ziel.replace(/\.jpg$/, '.tmp.png');
+      try {
+        await fuerComfy();
+        await new Promise((ok, fehler) => execFile(COMFY_PYTHON,
+          [path.join(KI_LOKAL, 'scripts', 'inpaint', 'lama.py'), '--bild', datei, '--maske', maske, '--aus', roh],
+          { windowsHide: true, timeout: 5 * 60 * 1000 },
+          (err, aus, feh) => (err ? fehler(new Error((feh || err.message).trim().split('\n').pop())) : ok(aus))));
+        if (roh !== ziel) { await sharp(roh).jpeg({ quality: 92 }).toFile(ziel); await unlink(roh); }
+      } finally { await unlink(maske).catch(() => {}); }
+      return { datei: ziel, info: 'Markiertes entfernt und aufgefüllt (LaMa)' };
     }
     case 'aufhellen':
     case 'schwarzweiss': {

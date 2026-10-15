@@ -59,6 +59,9 @@
   #alt p { margin: 0 0 8px; }
   .laeuft::after { content: ''; display: inline-block; width: 12px; height: 12px; margin-left: 8px; vertical-align: -1px;
     border: 2px solid var(--akzent); border-right-color: transparent; border-radius: 50%; animation: dreh 0.8s linear infinite; }
+  #ablage canvas { position: absolute; cursor: crosshair; touch-action: none; }
+  .malen { display: none; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
+  .malen.an { display: flex; }
   @keyframes dreh { to { transform: rotate(360deg); } }
 </style>
 </head>
@@ -110,6 +113,17 @@
         <button data-schritt="aufhellen" data-faktor="2">Stark aufhellen</button>
         <button data-schritt="schwarzweiss">Schwarzweiß</button>
       </div></div>
+      <div class="gruppe"><span class="leise">Inhalte entfernen</span><div class="knoepfe">
+        <button id="entfernen">Markieren und entfernen …</button>
+      </div>
+      <div class="malen" id="malen">
+        <label class="leise">Pinsel <input type="range" id="pinsel" min="5" max="150" value="40"></label>
+        <button id="radierer">Radierer</button>
+        <button id="leeren">Markierung löschen</button>
+        <button id="entfernenLos" class="haupt">Entfernen</button>
+        <button id="malenAbbrechen">Abbrechen</button>
+        <span class="leise" style="flex-basis:100%">Mit der Maus über das malen, was weg soll – lieber etwas großzügiger.</span>
+      </div></div>
       <div class="gruppe"><div class="knoepfe">
         <button data-schritt="web">Für Web optimieren</button>
         <button data-schritt="alttext">Alt-Text &amp; Dateiname</button>
@@ -141,7 +155,7 @@
 
 <script>
 const $ = s => document.querySelector(s);
-const NAMEN = { freistellen: 'Freistellen', vergroessern: 'Vergrößern', zuschneiden: 'Zuschneiden', schwarzweiss: 'Schwarzweiß', web: 'Für Web optimieren', alttext: 'Alt-Text & Dateiname' };
+const NAMEN = { freistellen: 'Freistellen', vergroessern: 'Vergrößern', zuschneiden: 'Zuschneiden', schwarzweiss: 'Schwarzweiß', entfernen: 'Entfernen', web: 'Für Web optimieren', alttext: 'Alt-Text & Dateiname' };
 const FORMATNAMEN = { hero: 'Hero 16:9', teaser: 'Teaser 3:2', quadrat: 'Quadrat 1:1', hoch: 'Hoch 2:3' };
 let zustand = { einstellungen: {}, verlauf: [], aktuell: null, plan: null, beschaeftigt: false };
 
@@ -213,6 +227,7 @@ async function ablegen(datei) {
 }
 
 async function zeigen(i) {
+  malenBeenden();
   zustand.aktuell = i;
   const { datei } = zustand.verlauf[i];
   const r = await fetch('/api/bild?pfad=' + encodeURIComponent(datei));
@@ -322,6 +337,66 @@ $('#beenden').onclick = async () => {
   log('Beende …', 'laeuft');
   await api('/api/beenden', {}).catch(() => {});
   document.body.innerHTML = '<p style="padding:40px">Bildwerkstatt beendet. Dieses Fenster kann geschlossen werden.</p>';
+};
+
+// ---------- Markieren und entfernen ----------
+let leinwand = null, radieren = false;
+function malenBeenden() {
+  leinwand?.remove(); leinwand = null;
+  $('#malen').classList.remove('an');
+}
+$('#entfernen').onclick = () => {
+  const img = ablage.querySelector('img');
+  if (!img) return log('Erst ein Bild ablegen.', 'fehler');
+  malenBeenden();
+  leinwand = document.createElement('canvas');
+  // Leinwand in Pixelgröße der Vorschau, deckungsgleich über dem Bild
+  leinwand.width = img.naturalWidth; leinwand.height = img.naturalHeight;
+  const lage = () => {
+    leinwand.style.left = img.offsetLeft + 'px'; leinwand.style.top = img.offsetTop + 'px';
+    leinwand.style.width = img.clientWidth + 'px'; leinwand.style.height = img.clientHeight + 'px';
+  };
+  lage(); window.addEventListener('resize', lage);
+  ablage.append(leinwand);
+  const ctx = leinwand.getContext('2d');
+  let zuletzt = null;
+  const punkt = e => { const r = leinwand.getBoundingClientRect(); return [(e.clientX - r.left) * leinwand.width / r.width, (e.clientY - r.top) * leinwand.height / r.height]; };
+  const strich = e => {
+    const p = punkt(e);
+    ctx.globalCompositeOperation = radieren ? 'destination-out' : 'source-over';
+    ctx.strokeStyle = 'rgba(255, 40, 80, 0.55)'; ctx.lineCap = ctx.lineJoin = 'round';
+    ctx.lineWidth = $('#pinsel').value * leinwand.width / leinwand.getBoundingClientRect().width;
+    ctx.beginPath(); ctx.moveTo(...(zuletzt || p)); ctx.lineTo(...p); ctx.stroke();
+    zuletzt = p;
+  };
+  leinwand.onpointerdown = e => { leinwand.setPointerCapture(e.pointerId); zuletzt = null; strich(e); };
+  leinwand.onpointermove = e => { if (e.buttons) strich(e); };
+  leinwand.onpointerup = () => { zuletzt = null; };
+  radieren = false; $('#radierer').classList.remove('an');
+  $('#malen').classList.add('an');
+};
+$('#radierer').onclick = () => { radieren = !radieren; $('#radierer').classList.toggle('haupt', radieren); };
+$('#leeren').onclick = () => leinwand?.getContext('2d').clearRect(0, 0, leinwand.width, leinwand.height);
+$('#malenAbbrechen').onclick = malenBeenden;
+$('#entfernenLos').onclick = async () => {
+  if (!leinwand) return;
+  // Markierung als Schwarzweiß-Maske: alles Bemalte wird weiß
+  const m = document.createElement('canvas');
+  m.width = leinwand.width; m.height = leinwand.height;
+  const c = m.getContext('2d');
+  c.fillStyle = '#000'; c.fillRect(0, 0, m.width, m.height);
+  c.drawImage(leinwand, 0, 0);
+  const d = c.getImageData(0, 0, m.width, m.height);
+  let bemalt = 0;
+  for (let i = 0; i < d.data.length; i += 4) {
+    const an = d.data[i] > 20; bemalt += an;
+    d.data[i] = d.data[i + 1] = d.data[i + 2] = an ? 255 : 0; d.data[i + 3] = 255;
+  }
+  if (!bemalt) return log('Nichts markiert.', 'fehler');
+  c.putImageData(d, 0, 0);
+  const maske = m.toDataURL('image/png');
+  malenBeenden();
+  await ausfuehren([{ schritt: 'entfernen', format: '', faktor: 0, maske }]);
 };
 
 laden().catch(err => log(err.message, 'fehler'));

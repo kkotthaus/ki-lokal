@@ -9,3 +9,5 @@ export const MEDIEN = path.join(PROJEKTE_KI, 'medien');
 export const PROJEKTE = path.join(path.dirname(PROJEKTE_KI), 'Projekte');
 export const STATUS = path.join(process.env.LOCALAPPDATA || PROJEKTE_KI, 'ki-lokal');
 export const EINSTELLUNGEN = path.join(STATUS, 'bildwerkstatt.json');
+// Python von ComfyUI (PyTorch mit CUDA) für eigene Skripte wie scripts/inpaint/lama.py
+export const COMFY_PYTHON = path.join(PROJEKTE_KI, 'ComfyUI (1)', 'ComfyUI', '.venv', 'Scripts', 'python.exe');

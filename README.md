@@ -44,11 +44,13 @@ Prüfen bei laufendem ComfyUI: `curl.exe http://127.0.0.1:8188/models/checkpoint
 | BiRefNet (MIT) | `ComfyUI\models\background_removal` | https://huggingface.co/Comfy-Org/BiRefNet |
 | Real-ESRGAN x4plus (BSD-3) | `ComfyUI\models\upscale_models` | https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth |
 | Qwen3.5 9B mit Bilderkennung (Apache 2.0) | LM Studio | `lms get qwen/qwen3.5-9b` |
+| LaMa big-lama.pt (Code Apache 2.0, trainiert auf Places2) | `ComfyUI\models\inpaint` | https://github.com/Sanster/models/releases/download/add_big_lama/big-lama.pt (MD5 e3aa4aaa15225a33ec84f9f4bc47e500) |
 
 ## Werkzeuge
 
 - `app/` – **Bildwerkstatt**: Bild per Drag & Drop ablegen, dann per Knopf oder freiem Text
-  freistellen, vergrößern, zuschneiden, aufhellen, schwarzweiß, fürs Web optimieren, Alt-Text und
+  freistellen, Inhalte entfernen (markieren mit dem Pinsel), vergrößern, zuschneiden, aufhellen,
+  schwarzweiß, fürs Web optimieren, Alt-Text und
   Dateinamen vorschlagen.
   Alles lokal auf der Grafikkarte (ComfyUI, LM Studio). Start: Verknüpfung „Bildwerkstatt“ auf dem
   Desktop bzw. `app\start.ps1` (http://127.0.0.1:8190), Beenden über den Knopf in der Oberfläche.
@@ -56,6 +58,8 @@ Prüfen bei laufendem ComfyUI: `curl.exe http://127.0.0.1:8188/models/checkpoint
   `%LOCALAPPDATA%\ki-lokal\bildwerkstatt.json` gemerkt. Das Original wird nur kopiert, nie verändert.
   Auf der Grafikkarte liegt immer nur ein Modell: vor ComfyUI wird das Sprachmodell entladen und umgekehrt.
 - `scripts/optimize-images.mjs` – Bilder in AVIF + WebP, 640/1280/1920 px (Kern in `scripts/bilder-web.mjs`)
+- `scripts/inpaint/lama.py` – markierte Inhalte entfernen und auffüllen (LaMa, läuft mit dem Python
+  von ComfyUI auf CUDA; jede markierte Stelle wird einzeln mit eigenem Ausschnitt bearbeitet)
 - `scripts/comfy/remove_bg.py` – freistellen, `scripts/comfy/upscale_api.json` – vergrößern mit Real-ESRGAN
 - `scripts/comfy/` – ComfyUI-Workflows (API-Export) und Skripte dafür
 - `scripts/comfy/generate.py` – Text-zu-Bild mit FLUX.1 schnell über die ComfyUI-API,
