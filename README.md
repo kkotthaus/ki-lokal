@@ -46,6 +46,14 @@ Prüfen bei laufendem ComfyUI: `curl.exe http://127.0.0.1:8188/models/checkpoint
 | Qwen3.5 9B mit Bilderkennung (Apache 2.0) | LM Studio | `lms get qwen/qwen3.5-9b` |
 | LaMa big-lama.pt (Code Apache 2.0, trainiert auf Places2) | `ComfyUI\models\inpaint` | https://github.com/Sanster/models/releases/download/add_big_lama/big-lama.pt (MD5 e3aa4aaa15225a33ec84f9f4bc47e500) |
 
+**Lizenz LaMa (Stand 2026-10-15):** Code Apache 2.0. Die Gewichte tragen auf Hugging Face
+„apache-2.0“, eingetragen vom Weiterverteiler, nicht vom LaMa-Team. Trainiert auf Places2:
+dessen Bilder sind nur für nicht-kommerzielle Forschung freigegeben (MIT CSAIL besitzt die
+Bildrechte nicht); zu daraus trainierten Modellen sagen die Bedingungen nichts. LaMa füllt nur aus
+dem jeweiligen Foto auf und übernimmt keine Trainingsbilder. Einschätzung: für eigene und
+Kundenfotos vertretbar und verbreitet (z. B. IOPaint), aber nicht als „lizenzrechtlich geprüft“
+angeben; verbindlich klärt das nur eine juristische Prüfung.
+
 ## Werkzeuge
 
 - `app/` – **Bildwerkstatt**: Bild per Drag & Drop ablegen, dann per Knopf oder freiem Text
