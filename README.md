@@ -63,6 +63,10 @@ angeben; verbindlich klärt das nur eine juristische Prüfung.
   Bildwerkstatt fragt sie am Platz 1 ab; bei Projekten wird die Seite aus `windows-dev/projekte.json` vorgeschlagen).
   Gelesen werden theme-color, Hauptfarben als CSS-Variablen (ACSS `--primary` usw., WordPress-Palette) und häufige Farben.
   Gewählte Farben gehen in den Prompt (Bild: ungefähr) und werden im SVG exakt gesetzt (`svg.py --palette`).
+  **Logo einsetzen:** Logo als Datei ablegen oder über „Logo holen“ von der Website wählen (Kandidaten aus `<img>` mit
+  „logo“ und den Icons); es wird im Zielordner unter `logos\` gespeichert. Position, Größe (12/20/35 % der Breite) und
+  helle/dunkle Fläche dahinter wählbar. In Bildern wird es eingerechnet, in SVGs als Vektor (bzw. eingebettetes PNG) eingefügt.
+  Fremde Logos nur mit Zustimmung des Inhabers verwenden.
   Oder ein Bild per Drag & Drop ablegen, dann per Knopf oder freiem Text
   freistellen, Inhalte entfernen (markieren mit dem Pinsel), vergrößern, zuschneiden, aufhellen,
   schwarzweiß, fürs Web optimieren, Alt-Text und

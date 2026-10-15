@@ -101,12 +101,92 @@ async function erstellen({ text, art = 'auto', format = 'auto', farben: vorgabe 
   return { ergebnisse, art: e.art, format: e.format, prompt: e.prompt };
 }
 
+// ---------- Logo einsetzen ----------
+// Position als Anteil [x, y] (0 = links/oben, 1 = rechts/unten)
+const LOGO_POS = { ol: [0, 0], or: [1, 0], ul: [0, 1], ur: [1, 1], mitte: [0.5, 0.5] };
+const LOGO_NAMEN = { ol: 'oben links', or: 'oben rechts', ul: 'unten links', ur: 'unten rechts', mitte: 'Mitte' };
+const FLAECHEN = { hell: 'rgba(255,255,255,0.88)', dunkel: 'rgba(20,23,28,0.78)' };
+const logoAnteil = s => Math.min(0.6, Math.max(0.05, Number(s.groesse) || 0.2));  // Logobreite als Anteil der Bildbreite
+function logoLage(W, H, ew, eh, s) {
+  const [fx, fy] = LOGO_POS[s.position] || LOGO_POS.ur;
+  const rand = Math.min(W, H) * 0.04;
+  return [rand + fx * (W - ew - 2 * rand), rand + fy * (H - eh - 2 * rand)];
+}
+
+async function logoInBild(datei, ziel, s, meta) {
+  const W = meta.width, H = meta.height;
+  const lw = Math.round(W * logoAnteil(s));
+  // SVG-Logos scharf rendern: Dichte so wählen, dass das Logo mindestens in Zielbreite vorliegt
+  const lmeta = await sharp(s.logo).metadata();
+  const dichte = lmeta.format === 'svg' ? Math.min(2400, Math.max(72, 72 * lw / (lmeta.width || 100) * 1.5)) : 0;
+  let logo = await sharp(s.logo, dichte ? { density: dichte } : {})
+    .resize({ width: lw, height: Math.round(H * 0.4), fit: 'inside' }).png().toBuffer();
+  let { width: ew, height: eh } = await sharp(logo).metadata();
+  if (FLAECHEN[s.flaeche]) {
+    // Fläche hinter dem Logo, damit es auf unruhigen Fotos lesbar bleibt
+    const pad = Math.round(Math.min(ew, eh) * 0.3 + 6);
+    const flaeche = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${ew + 2 * pad}" height="${eh + 2 * pad}"><rect width="100%" height="100%" rx="${pad}" fill="${FLAECHEN[s.flaeche]}"/></svg>`);
+    logo = await sharp(flaeche).composite([{ input: logo, left: pad, top: pad }]).png().toBuffer();
+    ew += 2 * pad; eh += 2 * pad;
+  }
+  const [x, y] = logoLage(W, H, ew, eh, s).map(Math.round);
+  const bild = sharp(datei).composite([{ input: logo, left: x, top: y }]);
+  await (path.extname(ziel) === '.jpg' ? bild.jpeg({ quality: 92 }) : bild.png()).toFile(ziel);
+}
+
+// SVG in SVG: Vektor-Logo als verschachteltes <svg>, Bild-Logo als eingebettetes <image>
+async function logoInSvg(datei, ziel, s) {
+  const basis = await readFile(datei, 'utf8');
+  const vb = (basis.match(/viewBox="([^"]+)"/) || [])[1]?.trim().split(/[\s,]+/).map(Number);
+  if (!vb || vb.length !== 4) throw new Error('Die SVG hat keine viewBox.');
+  const [, , W, H] = vb;
+  const lw = W * logoAnteil(s);
+  let lvb, logoTeil;  // logoTeil(x, y, w, h) liefert das Element
+  if (path.extname(s.logo).toLowerCase() === '.svg') {
+    const logo = (await readFile(s.logo, 'utf8')).replace(/<\?xml[^>]*>|<!DOCTYPE[^>]*>|<!--[\s\S]*?-->/gi, '');
+    const kopf = logo.match(/<svg\b[^>]*>/i)?.[0];
+    if (!kopf) throw new Error('Das Logo ist keine gültige SVG.');
+    const mass = n => parseFloat((kopf.match(new RegExp(`\\s${n}="([\\d.]+)`)) || [])[1]);
+    lvb = (kopf.match(/viewBox="([^"]+)"/i) || [])[1]?.trim().split(/[\s,]+/).map(Number) || [0, 0, mass('width') || 100, mass('height') || 100];
+    const innen = logo.slice(logo.indexOf(kopf) + kopf.length, logo.lastIndexOf('</svg>'));
+    logoTeil = (x, y, w, h) => `<svg x="${x}" y="${y}" width="${w}" height="${h}" viewBox="${lvb.join(' ')}" preserveAspectRatio="xMidYMid meet">${innen}</svg>`;
+  } else {
+    const m = await sharp(s.logo).metadata();
+    lvb = [0, 0, m.width, m.height];
+    const png = await sharp(s.logo).resize({ width: Math.min(m.width, 1200), withoutEnlargement: true }).png().toBuffer();
+    logoTeil = (x, y, w, h) => `<image x="${x}" y="${y}" width="${w}" height="${h}" href="data:image/png;base64,${png.toString('base64')}"/>`;
+  }
+  const lh = Math.min(lw * lvb[3] / lvb[2], H * 0.4);
+  const lwEcht = lh * lvb[2] / lvb[3];
+  const pad = FLAECHEN[s.flaeche] ? Math.min(lwEcht, lh) * 0.3 + 6 : 0;
+  const ew = lwEcht + 2 * pad, eh = lh + 2 * pad;
+  const r = n => Math.round(n * 100) / 100;
+  const [x, y] = logoLage(W, H, ew, eh, s).map((v, i) => v + vb[i]);
+  const flaeche = pad ? `<rect x="${r(x)}" y="${r(y)}" width="${r(ew)}" height="${r(eh)}" rx="${r(pad)}" fill="${FLAECHEN[s.flaeche]}"/>` : '';
+  const block = `<g class="logo">${flaeche}${logoTeil(r(x + pad), r(y + pad), r(lwEcht), r(lh))}</g>`;
+  await writeFile(ziel, basis.slice(0, basis.lastIndexOf('</svg>')) + block + '</svg>\n');
+}
+
+// Logo speichern: im Zielordner unter logos\ (gleiche Datei wird wiederverwendet)
+async function logoSpeichern(name, daten) {
+  const ordner = path.join(zielordner(), 'logos');
+  await mkdir(ordner, { recursive: true });
+  const { name: roh, ext } = path.parse(path.basename(name));
+  const basis = roh.replace(/[^\w.-]+/g, '-') || 'logo';
+  const vorhanden = path.join(ordner, basis + ext.toLowerCase());
+  if (await existiert(vorhanden) && md5(await readFile(vorhanden)) === md5(daten)) return vorhanden;
+  const ziel = await freierName(ordner, basis, ext.toLowerCase());
+  await writeFile(ziel, daten);
+  angelegt.add(ziel);
+  return ziel;
+}
+
 // ---------- Arbeitsschritte ----------
 async function schritt(datei, s) {
   const ordner = path.dirname(datei);
   const basis = path.parse(datei).name;
-  if (path.extname(datei).toLowerCase() === '.svg' && s.schritt !== 'alttext')
-    throw new Error('Eine SVG kann hier nur einen Alt-Text bekommen. Zum Bearbeiten das PNG im Verlauf wählen.');
+  if (path.extname(datei).toLowerCase() === '.svg' && !['alttext', 'logo'].includes(s.schritt))
+    throw new Error('Eine SVG kann hier nur Alt-Text und Logo bekommen. Zum Bearbeiten das PNG im Verlauf wählen.');
   const meta = await sharp(datei).metadata();
 
   switch (s.schritt) {
@@ -179,6 +259,14 @@ async function schritt(datei, s) {
       bild = s.schritt === 'schwarzweiss' ? bild.grayscale() : bild.gamma(2.2, stark ? 3.0 : 2.6);
       await (png ? bild.png() : bild.jpeg({ quality: 92 })).toFile(ziel);
       return { datei: ziel, info: s.schritt === 'schwarzweiss' ? 'in Schwarzweiß umgewandelt' : `aufgehellt (${stark ? 'stark' : 'leicht'})` };
+    }
+    case 'logo': {
+      if (!s.logo || !erlaubt(s.logo)) throw new Error('Erst ein Logo wählen (Datei oder von der Website).');
+      const svg = path.extname(datei).toLowerCase() === '.svg';
+      const ext = svg ? '.svg' : meta.hasAlpha || meta.format === 'png' ? '.png' : '.jpg';
+      const ziel = await freierName(ordner, `${basis}-logo`, ext);
+      await (svg ? logoInSvg : logoInBild)(datei, ziel, s, meta);
+      return { datei: ziel, info: `Logo eingesetzt (${LOGO_NAMEN[s.position] || LOGO_NAMEN.ur}, ${Math.round(logoAnteil(s) * 100)} % breit)` };
     }
     case 'web': {
       const webOrdner = path.join(ordner, 'web');
@@ -281,6 +369,28 @@ const routen = {
     await fuerSprachmodell();
     return sprachmodell.plan(JSON.parse(b).text);
   }),
+
+  // Logos einer Website: Kandidaten mit kleiner Vorschau (vom anderen Arbeitsplatz ist die Seite evtl. nicht erreichbar)
+  'POST /api/logos': async (_, b) => {
+    const r = await farben.logosVonWebsite(String(JSON.parse(b).url || '').trim());
+    const logos = await Promise.all(r.logos.map(async l => {
+      try {
+        const { daten } = await farben.logoHolen(l.url);
+        const png = await sharp(daten, { density: 150 }).resize({ width: 200, height: 90, fit: 'inside' }).png().toBuffer();
+        return { ...l, vorschau: `data:image/png;base64,${png.toString('base64')}` };
+      } catch { return null; }
+    }));
+    return { url: r.url, logos: logos.filter(Boolean) };
+  },
+  'POST /api/logo-holen': async (_, b) => {
+    const { daten, endung, name } = await farben.logoHolen(String(JSON.parse(b).url || ''));
+    return { datei: await logoSpeichern(name + endung, daten) };
+  },
+  'POST /api/logo-ablegen': async (req, b) => {
+    const name = decodeURIComponent(req.headers['x-dateiname'] || 'logo.png');
+    if (!/\.(svg|png|jpe?g|webp|avif|gif)$/i.test(name)) throw new Error('Logo bitte als SVG, PNG, JPG, WebP oder AVIF.');
+    return { datei: await logoSpeichern(name, b) };
+  },
 
   // Farben einer Website (auch *.local) auslesen
   'POST /api/farben': async (_, b) => farben.vonWebsite(String(JSON.parse(b).url || '').trim()),

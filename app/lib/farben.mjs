@@ -1,5 +1,5 @@
-// Farben einer Website lesen (auch Local-Seiten *.local): CSS-Variablen (ACSS, WordPress-Palette), theme-color,
-// sonst die häufigsten bunten Farben. Ergebnis als Hexwerte für Prompt und SVG.
+// Farben und Logos einer Website lesen (auch Local-Seiten *.local): CSS-Variablen (ACSS, WordPress-Palette),
+// theme-color, sonst die häufigsten bunten Farben; Logos aus <img> mit „logo“ und Icons.
 import http from 'node:http';
 import https from 'node:https';
 
@@ -33,7 +33,10 @@ export function holen(adresse, umleitungen = 5) {
       }
       const teile = []; let laenge = 0;
       res.on('data', d => { laenge += d.length; if (laenge > MAX_BYTES) req.destroy(new Error('Antwort zu groß')); else teile.push(d); });
-      res.on('end', () => ok({ text: Buffer.concat(teile).toString('utf8'), url: url.href }));
+      res.on('end', () => {
+        const daten = Buffer.concat(teile);
+        ok({ daten, text: daten.toString('utf8'), url: url.href, typ: String(res.headers['content-type'] || '').split(';')[0] });
+      });
       res.on('error', fehler);
     });
     req.on('timeout', () => req.destroy(new Error(`${url.host} antwortet nicht (Zeitüberschreitung)`)));
@@ -131,4 +134,46 @@ export async function vonWebsite(adresse) {
     .map(f => ({ hex: alsHex(f.rgb), name: f.name || '', haupt: Boolean(f.name) }));
   if (!farben.length) throw new Error('Auf der Seite keine Farben gefunden.');
   return { url: seite.url, farben };
+}
+
+// ---------- Logos ----------
+const MAX_LOGOS = 6;
+
+// Logo-Kandidaten einer Seite: <img> mit „logo“ in Klasse, Name oder Alt-Text, dazu die Icons (apple-touch-icon, icon)
+export async function logosVonWebsite(adresse) {
+  if (!/^https?:\/\//i.test(adresse)) adresse = 'https://' + adresse.trim();
+  const seite = await holen(adresse);
+  const html = seite.text.replace(/\\\//g, '/').replace(/\\"/g, '"');  // auch JSON-maskiertes HTML (\/ und \")
+  const attr = (tag, name) => (tag.match(new RegExp(`\\s${name}=["']([^"']*)`, 'i')) || [])[1] || '';
+  const kandidaten = [];
+  const dazu = (src, art, rang) => {
+    if (!src || src.startsWith('data:')) return;
+    try { src = new URL(src.replace(/&amp;/g, '&'), seite.url).href; } catch { return; }
+    if (!kandidaten.some(k => k.url === src)) kandidaten.push({ url: src, art, rang: rang - (/\.svg(\?|$)/i.test(src) ? 1 : 0) });
+  };
+  for (const [tag] of html.matchAll(/<img\s[^>]*>/gi)) {
+    const text = `${attr(tag, 'class')} ${attr(tag, 'id')} ${attr(tag, 'alt')} ${attr(tag, 'src')}`;
+    if (!/logo|wortbildmarke|bildmarke|brand/i.test(text)) continue;
+    // größte Variante aus srcset, sonst src (bei Lazy-Loading data-src)
+    const set = attr(tag, 'srcset').split(',').map(t => t.trim().split(/\s+/)).filter(t => t[0])
+      .sort((a, b) => parseFloat(b[1] || 0) - parseFloat(a[1] || 0));
+    dazu(set[0]?.[0] || attr(tag, 'data-src') || attr(tag, 'src'), 'Logo', /custom-logo|site-logo/i.test(text) ? 0 : 2);
+  }
+  for (const [tag] of html.matchAll(/<link\s[^>]*>/gi)) {
+    const rel = attr(tag, 'rel').toLowerCase();
+    if (rel.includes('apple-touch-icon')) dazu(attr(tag, 'href'), 'Icon', 5);
+    else if (rel.split(/\s+/).includes('icon')) dazu(attr(tag, 'href'), 'Icon', 6 - (parseInt(attr(tag, 'sizes')) || 0) / 1000);
+  }
+  if (!kandidaten.length) throw new Error('Auf der Seite kein Logo gefunden – Logo als Datei ablegen.');
+  return { url: seite.url, logos: kandidaten.sort((a, b) => a.rang - b.rang).slice(0, MAX_LOGOS).map(({ url, art }) => ({ url, art })) };
+}
+
+// Ein Logo holen; liefert Daten und Endung (nur Bildformate)
+export async function logoHolen(adresse) {
+  const r = await holen(adresse);
+  const endung = { 'image/svg+xml': '.svg', 'image/png': '.png', 'image/jpeg': '.jpg', 'image/webp': '.webp', 'image/gif': '.gif',
+    'image/x-icon': '.ico', 'image/vnd.microsoft.icon': '.ico', 'image/avif': '.avif' }[r.typ]
+    || (/<svg[\s>]/i.test(r.text.slice(0, 2000)) ? '.svg' : '');
+  if (!endung || endung === '.ico') throw new Error(`Kein verwendbares Bild (${r.typ || 'unbekannter Typ'}).`);
+  return { daten: r.daten, endung, name: decodeURIComponent(new URL(r.url).pathname.split('/').pop() || 'logo').replace(/\.[^.]+$/, '') };
 }

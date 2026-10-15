@@ -69,6 +69,16 @@
   #farbfelder button { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px 3px 4px; font-size: 12px; opacity: .45; }
   #farbfelder button.an { opacity: 1; border-color: var(--akzent); }
   #farbfelder i { width: 18px; height: 18px; border-radius: 4px; border: 1px solid var(--linie); }
+  .logozeile { display: flex; gap: 10px; align-items: center; }
+  #logovorschau { width: 140px; height: 64px; flex: 0 0 auto; display: flex; align-items: center; justify-content: center;
+    border: 2px dashed var(--linie); border-radius: 8px; font-size: 12px; color: var(--leise); text-align: center;
+    background: repeating-conic-gradient(var(--karo) 0 25%, transparent 0 50%) 0 0 / 10px 10px; }
+  #logovorschau.drueber { border-color: var(--akzent); }
+  #logovorschau img { max-width: 128px; max-height: 54px; }
+  #logowahl { display: flex; flex-wrap: wrap; gap: 6px; }
+  #logowahl button { padding: 4px; width: 110px; height: 56px;
+    background: repeating-conic-gradient(var(--karo) 0 25%, transparent 0 50%) 0 0 / 10px 10px; }
+  #logowahl img { max-width: 100%; max-height: 100%; }
   @keyframes dreh { to { transform: rotate(360deg); } }
 </style>
 </head>
@@ -113,8 +123,9 @@
       <div class="gruppe">
         <textarea id="wunsch" placeholder="z. B. „Erstelle ein SVG, das einen Handball darstellt“ oder „Foto: heller Bauernhofladen mit Gemüsekisten, Querformat“"></textarea>
         <div class="farbquelle">
-          <input type="text" id="farbquelle" placeholder="Farben von Website, z. B. https://paas.local">
+          <input type="text" id="farbquelle" placeholder="Website, z. B. https://paas.local" title="Website für Farben und Logo (auch Local-Seiten)">
           <button id="farbenHolen">Farben holen</button>
+          <button id="logosHolen" title="Logos dieser Website zur Auswahl unter „Logo einsetzen“ zeigen">Logo holen</button>
         </div>
         <div id="farbfelder"></div>
         <div class="knoepfe">
@@ -156,6 +167,20 @@
         <button id="malenAbbrechen">Abbrechen</button>
         <span class="leise" style="flex-basis:100%">Mit der Maus über das malen, was weg soll – lieber etwas großzügiger.</span>
       </div></div>
+      <div class="gruppe"><span class="leise">Logo einsetzen</span>
+        <div class="logozeile">
+          <div id="logovorschau" title="Logo-Datei hierher ziehen">Logo hierher ziehen</div>
+          <div class="knoepfe"><button id="logoDatei">Logo-Datei …</button></div>
+        </div>
+        <div id="logowahl"></div>
+        <div class="knoepfe">
+          <select id="logoPos" title="Position"><option value="ur">unten rechts</option><option value="ul">unten links</option><option value="or">oben rechts</option><option value="ol">oben links</option><option value="mitte">Mitte</option></select>
+          <select id="logoGroesse" title="Breite des Logos"><option value="0.12">klein</option><option value="0.2" selected>mittel</option><option value="0.35">groß</option></select>
+          <select id="logoFlaeche" title="Fläche hinter dem Logo"><option value="ohne">ohne Fläche</option><option value="hell">helle Fläche</option><option value="dunkel">dunkle Fläche</option></select>
+          <button id="logoLos" class="haupt">Einsetzen</button>
+        </div>
+        <input type="file" id="logodatei" accept="image/*,.svg" hidden>
+      </div>
       <div class="gruppe"><div class="knoepfe">
         <button data-schritt="web">Für Web optimieren</button>
         <button data-schritt="alttext">Alt-Text &amp; Dateiname</button>
@@ -187,7 +212,7 @@
 
 <script>
 const $ = s => document.querySelector(s);
-const NAMEN = { freistellen: 'Freistellen', vergroessern: 'Vergrößern', zuschneiden: 'Zuschneiden', schwarzweiss: 'Schwarzweiß', entfernen: 'Entfernen', web: 'Für Web optimieren', alttext: 'Alt-Text & Dateiname' };
+const NAMEN = { freistellen: 'Freistellen', vergroessern: 'Vergrößern', zuschneiden: 'Zuschneiden', schwarzweiss: 'Schwarzweiß', entfernen: 'Entfernen', web: 'Für Web optimieren', alttext: 'Alt-Text & Dateiname', logo: 'Logo einsetzen' };
 const FORMATNAMEN = { hero: 'Hero 16:9', teaser: 'Teaser 3:2', quadrat: 'Quadrat 1:1', hoch: 'Hoch 2:3' };
 let zustand = { einstellungen: {}, verlauf: [], aktuell: null, plan: null, beschaeftigt: false, projekte: [], farben: [], farbquelleAuto: '' };
 
@@ -406,6 +431,49 @@ $('#farbenHolen').onclick = async () => {
   } catch (err) { zeile.className = 'fehler'; zeile.textContent = `Farben: ${err.message}`; }
 };
 $('#farbquelle').onkeydown = e => { if (e.key === 'Enter') $('#farbenHolen').click(); };
+
+// ---------- Logo ----------
+function logoZeigen(datei) {
+  zustand.logo = datei;
+  $('#logovorschau').innerHTML = `<img src="/api/bild?pfad=${encodeURIComponent(datei)}" alt="" title="${datei}">`;
+}
+async function logoAblegen(datei) {
+  try {
+    const r = await api('/api/logo-ablegen', datei, { 'X-Dateiname': encodeURIComponent(datei.name) });
+    logoZeigen(r.datei); log(`Logo: ${r.datei}`, 'ok');
+  } catch (err) { log(`Logo: ${err.message}`, 'fehler'); }
+}
+const lv = $('#logovorschau');
+lv.ondragover = e => { e.preventDefault(); e.stopPropagation(); lv.classList.add('drueber'); };
+lv.ondragleave = () => lv.classList.remove('drueber');
+lv.ondrop = e => { e.preventDefault(); e.stopPropagation(); lv.classList.remove('drueber'); if (e.dataTransfer.files[0]) logoAblegen(e.dataTransfer.files[0]); };
+$('#logoDatei').onclick = () => $('#logodatei').click();
+$('#logodatei').onchange = e => { if (e.target.files[0]) logoAblegen(e.target.files[0]); e.target.value = ''; };
+$('#logosHolen').onclick = async () => {
+  const url = $('#farbquelle').value.trim();
+  if (!url) return log('Erst oben eine Website eintragen.', 'fehler');
+  const zeile = log(`Logos von ${url} …`, 'laeuft');
+  try {
+    const r = await api('/api/logos', { url });
+    $('#logowahl').innerHTML = '';
+    r.logos.forEach(l => {
+      const b = document.createElement('button');
+      b.title = `${l.art}: ${l.url}`;
+      b.innerHTML = `<img src="${l.vorschau}" alt="">`;
+      b.onclick = async () => {
+        try { const g = await api('/api/logo-holen', { url: l.url }); logoZeigen(g.datei); log(`Logo: ${g.datei}`, 'ok'); }
+        catch (err) { log(`Logo: ${err.message}`, 'fehler'); }
+      };
+      $('#logowahl').append(b);
+    });
+    zeile.className = 'ok'; zeile.textContent = `${r.logos.length} Logos gefunden – unter „Logo einsetzen“ eins anklicken`;
+  } catch (err) { zeile.className = 'fehler'; zeile.textContent = `Logos: ${err.message}`; }
+};
+$('#logoLos').onclick = () => {
+  if (!zustand.logo) return log('Erst ein Logo wählen: Datei ablegen oder oben „Logo holen“.', 'fehler');
+  ausfuehren([{ schritt: 'logo', format: '', faktor: 0, logo: zustand.logo,
+    position: $('#logoPos').value, groesse: Number($('#logoGroesse').value), flaeche: $('#logoFlaeche').value }]);
+};
 
 $('#erstellen').onclick = async () => {
   const text = $('#wunsch').value.trim();
