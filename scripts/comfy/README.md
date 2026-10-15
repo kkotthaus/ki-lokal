@@ -5,7 +5,7 @@ Hier liegen Workflows im API-Format (ComfyUI: Menü > Workflow > Export (API)).
 | Datei | Zweck |
 |---|---|
 | flux_api.json | Text-zu-Bild mit FLUX.1 schnell |
-| rmbg_api.json | Hintergrund entfernen (noch exportieren) |
+| rmbg_api.json | Hintergrund entfernen mit BiRefNet (Kernknoten von ComfyUI, wie Vorlage „Remove Background (BiRefNet)“) |
 
 ## start.ps1 / stop.ps1
 
@@ -47,3 +47,24 @@ python scripts/comfy/generate.py --prompt "helles Büro mit Pflanzen, Morgenlich
 
 Prompt-, Größen- und Sampler-Knoten werden über die Verbindungen des KSamplers
 gefunden, die Knoten-IDs im Workflow dürfen sich also ändern.
+
+## remove_bg.py
+
+Stellt ein Bild frei (Hintergrund transparent) mit `rmbg_api.json` und speichert
+es als PNG mit Alphakanal. Vorhandene Dateien werden nie überschrieben (Nummer
+läuft weiter). Nur Python-Standardbibliothek.
+
+Benötigt das Modell `birefnet.safetensors` (MIT-Lizenz, 424 MB) in
+`<ComfyUI-Datenordner>/models/background_removal/`, Quelle:
+https://huggingface.co/Comfy-Org/BiRefNet/resolve/main/background_removal/birefnet.safetensors
+
+```powershell
+python scripts/comfy/remove_bg.py --src bild.png --out D:/Projekte-KI/medien/raw/<projekt> --name motiv-freigestellt
+```
+
+| Parameter | Standard | Bedeutung |
+|---|---|---|
+| `--src` | (Pflicht) | Eingabebild |
+| `--out` | (Pflicht) | Zielordner |
+| `--name` | `<eingabe>-freigestellt` | Dateiname ohne Endung |
+| `--server` | http://127.0.0.1:8188 | ComfyUI-API |
