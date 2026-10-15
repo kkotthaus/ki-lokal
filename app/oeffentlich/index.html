@@ -105,6 +105,11 @@
         <button data-schritt="zuschneiden" data-format="quadrat">Quadrat 1:1</button>
         <button data-schritt="zuschneiden" data-format="hoch">Hoch 2:3</button>
       </div></div>
+      <div class="gruppe"><span class="leise">Farbe und Helligkeit</span><div class="knoepfe">
+        <button data-schritt="aufhellen" data-faktor="1">Aufhellen</button>
+        <button data-schritt="aufhellen" data-faktor="2">Stark aufhellen</button>
+        <button data-schritt="schwarzweiss">Schwarzweiß</button>
+      </div></div>
       <div class="gruppe"><div class="knoepfe">
         <button data-schritt="web">Für Web optimieren</button>
         <button data-schritt="alttext">Alt-Text &amp; Dateiname</button>
@@ -136,7 +141,7 @@
 
 <script>
 const $ = s => document.querySelector(s);
-const NAMEN = { freistellen: 'Freistellen', vergroessern: 'Vergrößern', zuschneiden: 'Zuschneiden', web: 'Für Web optimieren', alttext: 'Alt-Text & Dateiname' };
+const NAMEN = { freistellen: 'Freistellen', vergroessern: 'Vergrößern', zuschneiden: 'Zuschneiden', schwarzweiss: 'Schwarzweiß', web: 'Für Web optimieren', alttext: 'Alt-Text & Dateiname' };
 const FORMATNAMEN = { hero: 'Hero 16:9', teaser: 'Teaser 3:2', quadrat: 'Quadrat 1:1', hoch: 'Hoch 2:3' };
 let zustand = { einstellungen: {}, verlauf: [], aktuell: null, plan: null, beschaeftigt: false };
 
@@ -253,6 +258,7 @@ function beschaeftigt(an) {
 function titel(s) {
   if (s.schritt === 'vergroessern') return `Vergrößern ×${s.faktor || 2}`;
   if (s.schritt === 'zuschneiden') return FORMATNAMEN[s.format] || 'Zuschneiden';
+  if (s.schritt === 'aufhellen') return s.faktor === 2 ? 'Aufhellen (stark)' : 'Aufhellen (leicht)';
   return NAMEN[s.schritt];
 }
 

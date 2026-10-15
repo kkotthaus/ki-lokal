@@ -64,11 +64,13 @@ export async function plan(text) {
       freistellen: { type: 'boolean' },
       zuschneiden: { type: 'string', enum: ['nein', ...FORMATE] },
       vergroessern: { type: 'integer', enum: [0, 2, 4] },
+      aufhellen: { type: 'integer', enum: [0, 1, 2] },
+      schwarzweiss: { type: 'boolean' },
       web: { type: 'boolean' },
       alttext: { type: 'boolean' },
       hinweis: { type: 'string' },
     },
-    required: ['freistellen', 'zuschneiden', 'vergroessern', 'web', 'alttext', 'hinweis'],
+    required: ['freistellen', 'zuschneiden', 'vergroessern', 'aufhellen', 'schwarzweiss', 'web', 'alttext', 'hinweis'],
     additionalProperties: false,
   };
   const system = `Du liest eine Anweisung für die Bearbeitung eines Bildes und entscheidest für jeden Schritt,
@@ -76,15 +78,19 @@ ob der Nutzer ihn verlangt. Im Zweifel nein: nur was ausdrücklich gesagt wird.
 - freistellen: true nur wenn der Hintergrund weg/transparent soll oder „freistellen“ gesagt wird.
 - zuschneiden: hero (16:9, Banner, Titelbild, Querformat), teaser (3:2), quadrat (1:1), hoch (2:3, Hochformat), sonst "nein".
 - vergroessern: 2 oder 4 wenn größer/hochskaliert werden soll („doppelt“ = 2, „vierfach“ = 4, ohne Zahl 2), sonst 0.
+- aufhellen: 1 wenn heller/aufhellen gewünscht ist, 2 bei „deutlich“, „viel“ oder „stark“ heller, sonst 0.
+- schwarzweiss: true bei schwarzweiß, Graustufen oder s/w, sonst false.
 - web: true wenn es für Website/Internet optimiert oder fertig gemacht werden soll.
 - alttext: true wenn Alt-Text, Bildbeschreibung oder Dateiname gewünscht ist.
-- hinweis: Verlangt der Nutzer etwas, das keiner dieser Schritte kann (etwa Farben ändern, aufhellen,
+- hinweis: Verlangt der Nutzer etwas, das keiner dieser Schritte kann (etwa abdunkeln, Farben ändern,
   Text einfügen), nenne genau diesen Wunsch: „<Wunsch> kann die Bildwerkstatt noch nicht.“ Sonst "".`;
   const a = await frage([{ role: 'system', content: system }, { role: 'user', content: text }], schema);
   const schritte = [];
   if (a.freistellen) schritte.push({ schritt: 'freistellen', format: '', faktor: 0 });
   if (FORMATE.includes(a.zuschneiden)) schritte.push({ schritt: 'zuschneiden', format: a.zuschneiden, faktor: 0 });
   if (a.vergroessern) schritte.push({ schritt: 'vergroessern', format: '', faktor: a.vergroessern });
+  if (a.aufhellen) schritte.push({ schritt: 'aufhellen', format: '', faktor: a.aufhellen });
+  if (a.schwarzweiss) schritte.push({ schritt: 'schwarzweiss', format: '', faktor: 0 });
   if (a.web) schritte.push({ schritt: 'web', format: '', faktor: 0 });
   if (a.alttext) schritte.push({ schritt: 'alttext', format: '', faktor: 0 });
   return { schritte, hinweis: a.hinweis };

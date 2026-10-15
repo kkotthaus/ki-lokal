@@ -110,6 +110,19 @@ async function schritt(datei, s) {
       await (png ? bild.png() : bild.jpeg({ quality: 92 })).toFile(ziel);
       return { datei: ziel, info: `zugeschnitten ${rw}:${rh} (${w}×${h} px)` };
     }
+    case 'aufhellen':
+    case 'schwarzweiss': {
+      const png = meta.hasAlpha || meta.format === 'png';
+      const stark = s.faktor === 2;
+      const zusatz = s.schritt === 'schwarzweiss' ? 'sw' : stark ? 'heller-stark' : 'heller';
+      const ziel = await freierName(ordner, `${basis}-${zusatz}`, png ? '.png' : '.jpg');
+      let bild = sharp(datei);
+      // Aufhellen über Gamma: hebt Mitteltöne an, Lichter brennen nicht aus
+      // (2.2 → 2.6 ≈ +12 % mittlere Helligkeit, 2.2 → 3.0 ≈ +24 %; gemessen an einem Foto)
+      bild = s.schritt === 'schwarzweiss' ? bild.grayscale() : bild.gamma(2.2, stark ? 3.0 : 2.6);
+      await (png ? bild.png() : bild.jpeg({ quality: 92 })).toFile(ziel);
+      return { datei: ziel, info: s.schritt === 'schwarzweiss' ? 'in Schwarzweiß umgewandelt' : `aufgehellt (${stark ? 'stark' : 'leicht'})` };
+    }
     case 'web': {
       const webOrdner = path.join(ordner, 'web');
       const { dateien, breiten } = await webVarianten(datei, webOrdner);
@@ -131,13 +144,26 @@ async function schritt(datei, s) {
 let kette = Promise.resolve();
 const nacheinander = fn => (kette = kette.then(fn, fn));
 
+// Ordnerdialog von Windows (pwsh 7: moderner Dialog). Der Prozess startet verborgen; Windows wendet
+// „verborgen“ auf das erste Fenster an. Deshalb zuerst ein unsichtbares Hilfsfenster zeigen, das
+// diese Vorgabe verbraucht, dann den Dialog im Vordergrund darüber öffnen.
+// Das Hilfsfenster sitzt mittig auf dem Bildschirm des Vordergrundfensters (der Browser, in dem
+// gerade geklickt wurde), damit der Dialog dort erscheint und nicht auf dem Hauptbildschirm.
 function ordnerWaehlen(start) {
   const ps = `[Console]::OutputEncoding=[Text.Encoding]::UTF8; Add-Type -AssemblyName System.Windows.Forms;
-$d = New-Object System.Windows.Forms.FolderBrowserDialog; $d.Description = 'Ablage für die Bildwerkstatt wählen';
-$d.SelectedPath = $env:START; $f = New-Object System.Windows.Forms.Form -Property @{TopMost=$true};
-if ($d.ShowDialog($f) -eq 'OK') { $d.SelectedPath }`;
-  return new Promise(ok => execFile('powershell', ['-STA', '-NoProfile', '-Command', ps],
-    { env: { ...process.env, START: start || '' }, windowsHide: true }, (_, aus) => ok((aus || '').trim())));
+Add-Type -Namespace W -Name U -MemberDefinition '[DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();'
+$b = [System.Windows.Forms.Screen]::FromHandle([W.U]::GetForegroundWindow()).WorkingArea
+$f = New-Object System.Windows.Forms.Form -Property @{ TopMost = $true; ShowInTaskbar = $false; Opacity = 0;
+  FormBorderStyle = 'None'; StartPosition = 'Manual'; Width = 1; Height = 1;
+  Location = New-Object System.Drawing.Point(
+    [Math]::Max($b.X, $b.X + [int]($b.Width / 2) - 600), [Math]::Max($b.Y, $b.Y + [int]($b.Height / 2) - 360)) }  # Dialog ca. 1200×720
+$f.Show(); $f.Activate()
+$d = New-Object System.Windows.Forms.FolderBrowserDialog; $d.Description = 'Ablage für die Bildwerkstatt wählen'
+$d.UseDescriptionForTitle = $true; if ($env:START) { $d.SelectedPath = $env:START }
+if ($d.ShowDialog($f) -eq 'OK') { $d.SelectedPath }; $f.Close()`;
+  return new Promise(ok => execFile('pwsh', ['-STA', '-NoProfile', '-Command', ps],
+    { env: { ...process.env, START: start || '' }, windowsHide: true, timeout: 10 * 60 * 1000 },
+    (_, aus) => ok((aus || '').trim())));
 }
 
 // ---------- HTTP ----------

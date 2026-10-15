@@ -48,7 +48,8 @@ Prüfen bei laufendem ComfyUI: `curl.exe http://127.0.0.1:8188/models/checkpoint
 ## Werkzeuge
 
 - `app/` – **Bildwerkstatt**: Bild per Drag & Drop ablegen, dann per Knopf oder freiem Text
-  freistellen, vergrößern, zuschneiden, fürs Web optimieren, Alt-Text und Dateinamen vorschlagen.
+  freistellen, vergrößern, zuschneiden, aufhellen, schwarzweiß, fürs Web optimieren, Alt-Text und
+  Dateinamen vorschlagen.
   Alles lokal auf der Grafikkarte (ComfyUI, LM Studio). Start: Verknüpfung „Bildwerkstatt“ auf dem
   Desktop bzw. `app\start.ps1` (http://127.0.0.1:8190), Beenden über den Knopf in der Oberfläche.
   Ziel ist ein Projekt (`medien\raw\<projekt>`) oder eine frei gewählte Ablage; die Wahl wird in
