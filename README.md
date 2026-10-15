@@ -65,6 +65,12 @@ angeben; verbindlich klärt das nur eine juristische Prüfung.
   Ziel ist ein Projekt (`medien\raw\<projekt>`) oder eine frei gewählte Ablage; die Wahl wird in
   `%LOCALAPPDATA%\ki-lokal\bildwerkstatt.json` gemerkt. Das Original wird nur kopiert, nie verändert.
   Auf der Grafikkarte liegt immer nur ein Modell: vor ComfyUI wird das Sprachmodell entladen und umgekehrt.
+  **Vom anderen Arbeitsplatz:** In den Einstellungen `"netzwerk": true` und unter `"rechner"` die erlaubten
+  IP-Adressen (Platz 2: 192.168.110.51). Dann erreichbar unter http://192.168.110.50:8190, beim ersten Mal mit
+  Zugangsschlüssel (liegt in `%LOCALAPPDATA%\ki-lokal\bildwerkstatt-schluessel.txt`, Kopie in Vaultwarden;
+  am Rechner selbst über „Schlüssel kopieren“). Von außen: Ergebnisse über „Herunterladen“ bzw. „Web-Größen (ZIP)“,
+  kein Ordnerdialog, keine neuen Ablagen, kein Beenden. Firewall-Regel (einmal, als Administrator):
+  `New-NetFirewallRule -DisplayName "Bildwerkstatt (Port 8190, nur Platz 2)" -Direction Inbound -Protocol TCP -LocalPort 8190 -RemoteAddress 192.168.110.51 -Action Allow -Profile Domain,Private`
 - `scripts/optimize-images.mjs` – Bilder in AVIF + WebP, 640/1280/1920 px (Kern in `scripts/bilder-web.mjs`)
 - `scripts/inpaint/lama.py` – markierte Inhalte entfernen und auffüllen (LaMa, läuft mit dem Python
   von ComfyUI auf CUDA; jede markierte Stelle wird einzeln mit eigenem Ausschnitt bearbeitet)

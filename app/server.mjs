@@ -1,6 +1,8 @@
 // Bildwerkstatt: Bild ablegen, auswählen was passieren soll, alles mit der lokalen KI.
 // Start: app\start.ps1 (öffnet http://127.0.0.1:8190 im Browser)
+// Mit "netzwerk": true in den Einstellungen auch von anderen Rechnern im Netz erreichbar (mit Zugangsschlüssel).
 import http from 'node:http';
+import os from 'node:os';
 import { createHash } from 'node:crypto';
 import { readFile, writeFile, mkdir, copyFile, rename, unlink, stat, access } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
@@ -10,13 +12,15 @@ import { MEDIEN, PROJEKTE, STATUS, EINSTELLUNGEN, KI_LOKAL, COMFY_PYTHON } from 
 import * as comfy from './lib/comfy.mjs';
 import * as sprachmodell from './lib/sprachmodell.mjs';
 import { webVarianten } from '../scripts/bilder-web.mjs';
+import * as zugang from './lib/zugang.mjs';
 
 const PORT = 8190;
 const OEFFENTLICH = path.join(KI_LOKAL, 'app', 'oeffentlich');
 const FORMATE = { hero: [16, 9], teaser: [3, 2], quadrat: [1, 1], hoch: [2, 3] };
 
 // ---------- Einstellungen (gemerkt in %LOCALAPPDATA%\ki-lokal\bildwerkstatt.json) ----------
-const STANDARD = { modus: 'projekt', projekt: '', ablage: '', ablagen: [], modell: 'qwen/qwen3.5-9b' };
+const STANDARD = { modus: 'projekt', projekt: '', ablage: '', ablagen: [], modell: 'qwen/qwen3.5-9b', netzwerk: false, rechner: [] };
+// netzwerk: auch im Netz erreichbar; rechner: IP-Adressen, die zugreifen dürfen (leer = keiner von außen)
 let einstellungen = { ...STANDARD };
 try { einstellungen = { ...STANDARD, ...JSON.parse(await readFile(EINSTELLUNGEN, 'utf8')) }; } catch { /* erster Start */ }
 async function speichern() {
@@ -196,10 +200,17 @@ function json(res, code, daten) {
 }
 
 const routen = {
-  'GET /api/status': async () => ({ einstellungen, projekte: await projekte(), ziel: (() => { try { return zielordner(); } catch { return ''; } })() }),
+  'GET /api/status': async (req) => ({
+    einstellungen, projekte: await projekte(), ziel: (() => { try { return zielordner(); } catch { return ''; } })(),
+    fern: !zugang.lokal(req),
+    // Nur am Rechner selbst: Adresse und Schlüssel für den Zugriff vom anderen Arbeitsplatz
+    netzwerk: einstellungen.netzwerk && zugang.lokal(req) ? { adresse: `http://${eigeneAdresse()}:${PORT}`, schluessel: SCHLUESSEL } : null,
+  }),
 
-  'POST /api/einstellungen': async (_, b) => {
+  'POST /api/einstellungen': async (req, b) => {
     const e = JSON.parse(b);
+    // Von außen nur eine der gemerkten Ablagen wählen, keine neuen Ordner dieses Rechners freigeben
+    if (e.ablage && !zugang.lokal(req) && !einstellungen.ablagen.some(a => a.toLowerCase() === path.resolve(e.ablage).toLowerCase())) throw new Error('Neue Ablagen nur am Rechner selbst wählen.');
     if (e.modus) einstellungen.modus = e.modus === 'ablage' ? 'ablage' : 'projekt';
     if (e.projekt !== undefined) einstellungen.projekt = e.projekt;
     if (e.ablage) {
@@ -212,7 +223,10 @@ const routen = {
     return { einstellungen, ziel: zielordner() };
   },
 
-  'POST /api/ordner-waehlen': async () => ({ ordner: await ordnerWaehlen(einstellungen.ablage) }),
+  'POST /api/ordner-waehlen': async (req) => {
+    if (!zugang.lokal(req)) throw new Error('Der Ordnerdialog öffnet sich nur am Rechner selbst.');
+    return { ordner: await ordnerWaehlen(einstellungen.ablage) };
+  },
 
   // Original in den Zielordner kopieren (nie verändern); gleiche Datei wird wiederverwendet
   'POST /api/ablegen': async (req, b) => {
@@ -259,7 +273,8 @@ const routen = {
     return { ok: true };
   },
 
-  'POST /api/beenden': async () => {
+  'POST /api/beenden': async (req) => {
+    if (!zugang.lokal(req)) throw new Error('Beenden nur am Rechner selbst.');
     await sprachmodell.entladen();
     await comfy.stoppen();
     setTimeout(() => process.exit(0), 200);
@@ -269,9 +284,57 @@ const routen = {
 
 const TYPEN = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml' };
 
+const SCHLUESSEL = await zugang.schluessel();
+// IPv4-Adresse dieses Rechners im Netz (für die Anzeige am Rechner selbst): bevorzugt im Netz der eingetragenen Rechner
+const eigeneAdresse = () => {
+  const alle = Object.values(os.networkInterfaces()).flat().filter(a => a.family === 'IPv4' && !a.internal).map(a => a.address);
+  const netz = (einstellungen.rechner[0] || '').split('.').slice(0, 3).join('.') + '.';
+  return alle.find(a => a.startsWith(netz)) || alle[0] || os.hostname();
+};
+
 http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
   try {
+    // Andere Rechner: erst anmelden (Schlüssel einmal eingeben, dann Cookie)
+    if (!zugang.lokal(req)) {
+      // Nur die eingetragenen Rechner (z. B. Arbeitsplatz 2), alle anderen gar nicht erst bedienen
+      const von = (req.socket.remoteAddress || '').replace(/^::ffff:/, '');
+      if (!einstellungen.rechner.includes(von)) { res.writeHead(403); return res.end(); }
+      if (req.method === 'POST' && url.pathname === '/anmelden') {
+        const eingabe = new URLSearchParams((await koerper(req)).toString()).get('schluessel');
+        if (!zugang.pruefen(eingabe, SCHLUESSEL)) {
+          await new Promise(r => setTimeout(r, 1000));  // Raten bremsen
+          res.writeHead(401, { 'Content-Type': 'text/html; charset=utf-8' });
+          return res.end(zugang.ANMELDESEITE('Der Schlüssel stimmt nicht.'));
+        }
+        res.writeHead(303, { 'Set-Cookie': zugang.anmeldeCookie(SCHLUESSEL), Location: '/' });
+        return res.end();
+      }
+      if (!zugang.angemeldet(req, SCHLUESSEL)) {
+        if (url.pathname.startsWith('/api/')) return json(res, 401, { fehler: 'Nicht angemeldet – Seite neu laden.' });
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        return res.end(zugang.ANMELDESEITE());
+      }
+    }
+    // Schutz gegen fremde Webseiten im Browser: Aufrufe der Oberfläche tragen diesen Kopf, fremde Seiten können ihn nicht setzen
+    if (req.method === 'POST' && url.pathname.startsWith('/api/') && req.headers['x-bildwerkstatt'] !== '1') return json(res, 403, { fehler: 'nicht erlaubt' });
+
+    // Datei herunterladen (z. B. am anderen Arbeitsplatz)
+    if (req.method === 'GET' && url.pathname === '/api/datei') {
+      const datei = url.searchParams.get('pfad');
+      if (!erlaubt(datei)) return json(res, 403, { fehler: 'nicht erlaubt' });
+      const inhalt = await readFile(datei);
+      res.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(path.basename(datei))}` });
+      return res.end(inhalt);
+    }
+    // Mehrere Dateien als ZIP (Web-Größen)
+    if (req.method === 'POST' && url.pathname === '/api/zip') {
+      const { dateien, name } = JSON.parse(await koerper(req));
+      if (!dateien?.length || !dateien.every(erlaubt)) return json(res, 403, { fehler: 'nicht erlaubt' });
+      const eintraege = await Promise.all(dateien.map(async d => ({ name: path.basename(d), daten: await readFile(d) })));
+      res.writeHead(200, { 'Content-Type': 'application/zip', 'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent((name || 'web') + '.zip')}` });
+      return res.end(zugang.zip(eintraege));
+    }
     // Vorschaubild, verkleinert
     if (req.method === 'GET' && url.pathname === '/api/bild') {
       const datei = url.searchParams.get('pfad');
@@ -293,4 +356,5 @@ http.createServer(async (req, res) => {
   } catch (e) {
     json(res, 500, { fehler: e.message });
   }
-}).listen(PORT, '127.0.0.1', () => console.log(`Bildwerkstatt: http://127.0.0.1:${PORT}`));
+}).listen(PORT, einstellungen.netzwerk ? '0.0.0.0' : '127.0.0.1', () => console.log(
+  `Bildwerkstatt: http://127.0.0.1:${PORT}` + (einstellungen.netzwerk ? ` und im Netz http://${eigeneAdresse()}:${PORT} für ${einstellungen.rechner.join(', ') || 'niemanden'}` : '')));
