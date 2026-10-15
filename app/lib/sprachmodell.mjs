@@ -126,3 +126,35 @@ dateiname: 2 bis 5 deutsche Wörter in Kleinbuchstaben mit Bindestrich, ohne Uml
     .replace(/[^a-z0-9]+/g, '-').replace(/-(jpe?g|png|webp|avif)$/, '').replace(/^-|-$/g, '');
   return a;
 }
+
+// Wunsch für ein neues Bild in einen englischen FLUX-Prompt übersetzen; Art und Format nur, wenn nicht vorgegeben.
+export async function entwurf(text, art = 'auto', format = 'auto') {
+  const schema = {
+    type: 'object',
+    properties: {
+      art: { type: 'string', enum: ['bild', 'svg'] },
+      format: { type: 'string', enum: FORMATE },
+      motiv: { type: 'string' },
+      dateiname: { type: 'string' },
+    },
+    required: ['art', 'format', 'motiv', 'dateiname'],
+    additionalProperties: false,
+  };
+  const system = `Du bereitest die Erzeugung einer Grafik mit dem Bildmodell FLUX vor.
+- art: "svg" wenn eine SVG, Vektorgrafik, ein Icon, Symbol, Piktogramm oder Logo gewünscht ist, sonst "bild".
+- format: hero (16:9, Banner, Querformat), teaser (3:2), quadrat (1:1), hoch (2:3, Hochformat). Ohne Angabe: quadrat bei svg, sonst hero.
+- motiv: das Motiv als englische Bildbeschreibung, 15 bis 60 Wörter, konkret (Gegenstand, Farben, Licht, Umgebung).
+  Bei svg nur der Gegenstand selbst: seine Formen und 2 bis 4 klare Farben, ohne Hintergrund, Licht, Schatten oder Schattierung.
+  Keine echten Personen, keine Marken oder Logos fremder Firmen, kein Text im Bild, außer der Nutzer verlangt ihn.
+- dateiname: 2 bis 4 deutsche Wörter in Kleinbuchstaben mit Bindestrich, ohne Umlaute, ohne Endung.`;
+  const a = await frage([{ role: 'system', content: system }, { role: 'user', content: text }], schema);
+  if (art !== 'auto') a.art = art;
+  if (FORMATE.includes(format)) a.format = format;
+  a.prompt = a.art === 'svg'
+    ? `Minimalist flat vector icon: ${a.motiv.replace(/\.$/, '')}. Large, filling most of the frame, centered. Simple geometric shapes, 2 to 4 solid flat colors, uniform bold dark outlines, no gradients, no shading, no highlights, no shadow, no text, isolated on a plain pure white background.`
+    : a.motiv;
+  a.dateiname = a.dateiname.toLowerCase()
+    .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
+    .replace(/[^a-z0-9]+/g, '-').replace(/-(svg|png|jpe?g|bild|datei)$/, '').replace(/^-|-$/g, '') || 'grafik';
+  return a;
+}

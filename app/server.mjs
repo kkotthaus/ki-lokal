@@ -17,6 +17,8 @@ import * as zugang from './lib/zugang.mjs';
 const PORT = 8190;
 const OEFFENTLICH = path.join(KI_LOKAL, 'app', 'oeffentlich');
 const FORMATE = { hero: [16, 9], teaser: [3, 2], quadrat: [1, 1], hoch: [2, 3] };
+// Bildgrößen für FLUX je Format (Vielfache von 64, um 1 Megapixel)
+const FLUX = { hero: [1344, 768], teaser: [1216, 832], quadrat: [1024, 1024], hoch: [832, 1216] };
 
 // ---------- Einstellungen (gemerkt in %LOCALAPPDATA%\ki-lokal\bildwerkstatt.json) ----------
 const STANDARD = { modus: 'projekt', projekt: '', ablage: '', ablagen: [], modell: 'qwen/qwen3.5-9b', netzwerk: false, rechner: [] };
@@ -65,10 +67,40 @@ const md5 = buf => createHash('md5').update(buf).digest('hex');
 async function fuerComfy() { await sprachmodell.entladen(); }
 async function fuerSprachmodell() { await comfy.freigeben(); await sprachmodell.bereit(einstellungen.modell); }
 
+function python(skript, args) {
+  return new Promise((ok, fehler) => execFile(COMFY_PYTHON, [path.join(KI_LOKAL, 'scripts', ...skript), ...args],
+    { windowsHide: true, timeout: 5 * 60 * 1000 },
+    (err, aus, feh) => (err ? fehler(new Error((feh || err.message).trim().split('\n').pop())) : ok(aus))));
+}
+
+// ---------- Neu erstellen: Text → Bild (FLUX), bei SVG weiter nachzeichnen ----------
+async function erstellen({ text, art = 'auto', format = 'auto' }) {
+  if (!String(text || '').trim()) throw new Error('Bitte beschreiben, was entstehen soll.');
+  const ordner = zielordner();
+  await mkdir(ordner, { recursive: true });
+  await fuerSprachmodell();
+  const e = await sprachmodell.entwurf(text, art, format);
+  await fuerComfy();
+  const [w, h] = FLUX[e.format];
+  const bild = await freierName(ordner, e.dateiname, '.png');
+  await comfy.erzeugen(e.prompt, w, h, bild);
+  const ergebnisse = [{ datei: bild, titel: 'Erstellt' }];
+  if (e.art === 'svg') {
+    // Weißer Hintergrund fällt beim Nachzeichnen weg (vom Rand aus, weiße Flächen im Motiv bleiben)
+    const svg = await freierName(ordner, path.parse(bild).name, '.svg');
+    await python(['vektor', 'svg.py'], ['--bild', bild, '--aus', svg]);
+    ergebnisse.push({ datei: svg, titel: 'SVG' });
+  }
+  ergebnisse.forEach(r => angelegt.add(r.datei));
+  return { ergebnisse, art: e.art, format: e.format, prompt: e.prompt };
+}
+
 // ---------- Arbeitsschritte ----------
 async function schritt(datei, s) {
   const ordner = path.dirname(datei);
   const basis = path.parse(datei).name;
+  if (path.extname(datei).toLowerCase() === '.svg' && s.schritt !== 'alttext')
+    throw new Error('Eine SVG kann hier nur einen Alt-Text bekommen. Zum Bearbeiten das PNG im Verlauf wählen.');
   const meta = await sharp(datei).metadata();
 
   switch (s.schritt) {
@@ -124,10 +156,7 @@ async function schritt(datei, s) {
       const roh = ziel.replace(/\.jpg$/, '.tmp.png');
       try {
         await fuerComfy();
-        await new Promise((ok, fehler) => execFile(COMFY_PYTHON,
-          [path.join(KI_LOKAL, 'scripts', 'inpaint', 'lama.py'), '--bild', datei, '--maske', maske, '--aus', roh],
-          { windowsHide: true, timeout: 5 * 60 * 1000 },
-          (err, aus, feh) => (err ? fehler(new Error((feh || err.message).trim().split('\n').pop())) : ok(aus))));
+        await python(['inpaint', 'lama.py'], ['--bild', datei, '--maske', maske, '--aus', roh]);
         if (roh !== ziel) { await sharp(roh).jpeg({ quality: 92 }).toFile(ziel); await unlink(roh); }
       } finally { await unlink(maske).catch(() => {}); }
       return { datei: ziel, info: 'Markiertes entfernt und aufgefüllt (LaMa)' };
@@ -245,6 +274,12 @@ const routen = {
   'POST /api/plan': (_, b) => nacheinander(async () => {
     await fuerSprachmodell();
     return sprachmodell.plan(JSON.parse(b).text);
+  }),
+
+  'POST /api/erstellen': (_, b) => nacheinander(async () => {
+    const start = Date.now();
+    const erg = await erstellen(JSON.parse(b));
+    return { ...erg, sekunden: Math.round((Date.now() - start) / 100) / 10 };
   }),
 
   'POST /api/schritt': (_, b) => nacheinander(async () => {

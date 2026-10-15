@@ -56,7 +56,10 @@ angeben; verbindlich klärt das nur eine juristische Prüfung.
 
 ## Werkzeuge
 
-- `app/` – **Bildwerkstatt**: Bild per Drag & Drop ablegen, dann per Knopf oder freiem Text
+- `app/` – **Bildwerkstatt**: **Neu erstellen** nach Beschreibung („Erstelle ein SVG, das einen Handball darstellt“):
+  das Sprachmodell wählt Art (Bild/SVG) und Format und schreibt den englischen Prompt, FLUX erzeugt das Bild;
+  bei SVG wird es nachgezeichnet (`scripts/vektor/svg.py`), mit Knopf „SVG-Code kopieren“. Jeder Klick ergibt eine neue Variante.
+  Oder ein Bild per Drag & Drop ablegen, dann per Knopf oder freiem Text
   freistellen, Inhalte entfernen (markieren mit dem Pinsel), vergrößern, zuschneiden, aufhellen,
   schwarzweiß, fürs Web optimieren, Alt-Text und
   Dateinamen vorschlagen.
@@ -74,6 +77,9 @@ angeben; verbindlich klärt das nur eine juristische Prüfung.
 - `scripts/optimize-images.mjs` – Bilder in AVIF + WebP, 640/1280/1920 px (Kern in `scripts/bilder-web.mjs`)
 - `scripts/inpaint/lama.py` – markierte Inhalte entfernen und auffüllen (LaMa, läuft mit dem Python
   von ComfyUI auf CUDA; jede markierte Stelle wird einzeln mit eigenem Ausschnitt bearbeitet)
+- `scripts/vektor/svg.py` – Bild in SVG umwandeln (vtracer): heller Hintergrund fällt vom Rand aus weg (weiße Flächen im
+  Motiv bleiben), wenige Farben per k-Means, Ergebnis mit viewBox. Taugt für flache Grafiken und Icons, nicht für Fotos.
+  vtracer liegt in der Python-Umgebung von ComfyUI: `uv pip install --python "<ComfyUI>\.venv\Scripts\python.exe" vtracer`
 - `scripts/comfy/remove_bg.py` – freistellen, `scripts/comfy/upscale_api.json` – vergrößern mit Real-ESRGAN
 - `scripts/comfy/` – ComfyUI-Workflows (API-Export) und Skripte dafür
 - `scripts/comfy/generate.py` – Text-zu-Bild mit FLUX.1 schnell über die ComfyUI-API,

@@ -63,6 +63,20 @@ export async function ausfuehren(workflowDatei, eingabe, ausgabe, anpassen = () 
   const workflow = JSON.parse(await readFile(path.join(WORKFLOWS, workflowDatei), 'utf8'));
   workflow['1'].inputs.image = await hochladen(eingabe);
   anpassen(workflow);
+  return lauf(workflow, '6', ausgabe);
+}
+
+// Text zu Bild mit FLUX.1 schnell (flux_api.json): Ergebnis von Knoten "9" als PNG.
+export async function erzeugen(prompt, breite, hoehe, ausgabe) {
+  await bereit();
+  const workflow = JSON.parse(await readFile(path.join(WORKFLOWS, 'flux_api.json'), 'utf8'));
+  workflow['6'].inputs.text = prompt;
+  Object.assign(workflow['5'].inputs, { width: breite, height: hoehe, batch_size: 1 });
+  workflow['3'].inputs.seed = Math.floor(Math.random() * 2 ** 48);  // jedes Mal eine neue Variante
+  return lauf(workflow, '9', ausgabe);
+}
+
+async function lauf(workflow, knoten, ausgabe) {
   const { prompt_id } = await (await api('/prompt', { methode: 'POST', json: { prompt: workflow } })).json();
   const bis = Date.now() + 15 * 60 * 1000;
   while (Date.now() < bis) {
@@ -73,7 +87,7 @@ export async function ausfuehren(workflowDatei, eingabe, ausgabe, anpassen = () 
         const meldung = eintrag.status.messages?.find(m => m[0] === 'execution_error')?.[1]?.exception_message;
         throw new Error(`ComfyUI-Fehler: ${meldung || JSON.stringify(eintrag.status)}`);
       }
-      const bild = eintrag.outputs['6'].images[0];
+      const bild = eintrag.outputs[knoten].images[0];
       const q = new URLSearchParams({ filename: bild.filename, subfolder: bild.subfolder, type: bild.type });
       await writeFile(ausgabe, Buffer.from(await (await api(`/view?${q}`)).arrayBuffer()));
       return ausgabe;
