@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bildwerkstatt</title>
+<style>
+  :root {
+    --bg: #f4f5f7; --flaeche: #ffffff; --text: #1d2330; --leise: #667085; --linie: #dfe3ea;
+    --akzent: #2f6fde; --akzent-text: #ffffff; --gut: #1f8a4c; --fehler: #c23a3a;
+    --karo: #e9ecf1;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #14171c; --flaeche: #1d2128; --text: #e6e9ef; --leise: #98a2b3; --linie: #2e343e;
+      --akzent: #5b8ff0; --akzent-text: #0d1117; --gut: #4cc38a; --fehler: #f07070; --karo: #262b33; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.45 system-ui, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); }
+  header { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; padding: 12px 20px;
+    background: var(--flaeche); border-bottom: 1px solid var(--linie); }
+  h1 { font-size: 18px; margin: 0 8px 0 0; }
+  .leise { color: var(--leise); font-size: 13px; }
+  button, select, input, textarea { font: inherit; color: inherit; }
+  button { border: 1px solid var(--linie); background: var(--flaeche); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+  button:hover:not(:disabled) { border-color: var(--akzent); }
+  button:disabled { opacity: .45; cursor: default; }
+  button.haupt { background: var(--akzent); color: var(--akzent-text); border-color: var(--akzent); }
+  select, input[type=text], textarea { border: 1px solid var(--linie); background: var(--bg); border-radius: 8px; padding: 6px 10px; }
+  .umschalter { display: inline-flex; border: 1px solid var(--linie); border-radius: 8px; overflow: hidden; }
+  .umschalter button { border: 0; border-radius: 0; }
+  .umschalter button.an { background: var(--akzent); color: var(--akzent-text); }
+  .ziel { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; flex: 1; }
+  .pfad { font-family: ui-monospace, Consolas, monospace; font-size: 12px; color: var(--leise); word-break: break-all; }
+  main { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 20px; padding: 20px; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  .karte { background: var(--flaeche); border: 1px solid var(--linie); border-radius: 12px; padding: 16px; }
+  #ablage { min-height: 420px; display: flex; align-items: center; justify-content: center; text-align: center;
+    border: 2px dashed var(--linie); border-radius: 12px; background: var(--flaeche); position: relative; }
+  #ablage.drueber { border-color: var(--akzent); }
+  #ablage img { max-width: 100%; max-height: 62vh; display: block;
+    background: repeating-conic-gradient(var(--karo) 0 25%, transparent 0 50%) 0 0 / 20px 20px; }
+  .bildinfo { margin-top: 8px; display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+  #verlauf { display: flex; gap: 10px; overflow-x: auto; padding: 12px 0 4px; }
+  #verlauf figure { margin: 0; flex: 0 0 auto; width: 120px; cursor: pointer; }
+  #verlauf img { width: 120px; height: 90px; object-fit: contain; border: 2px solid var(--linie); border-radius: 8px;
+    background: repeating-conic-gradient(var(--karo) 0 25%, transparent 0 50%) 0 0 / 12px 12px; }
+  #verlauf figure.an img { border-color: var(--akzent); }
+  #verlauf figcaption { font-size: 12px; color: var(--leise); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  aside { display: flex; flex-direction: column; gap: 16px; }
+  aside h2 { font-size: 14px; margin: 0 0 10px; text-transform: uppercase; letter-spacing: .04em; color: var(--leise); }
+  .knoepfe { display: flex; flex-wrap: wrap; gap: 8px; }
+  .gruppe { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+  textarea { width: 100%; min-height: 70px; resize: vertical; }
+  ol#plan { margin: 10px 0; padding-left: 22px; }
+  #protokoll { font-size: 13px; max-height: 220px; overflow-y: auto; }
+  #protokoll div { padding: 3px 0; border-bottom: 1px solid var(--linie); }
+  .ok { color: var(--gut); } .fehler { color: var(--fehler); }
+  #alt { display: none; }
+  #alt p { margin: 0 0 8px; }
+  .laeuft::after { content: ''; display: inline-block; width: 12px; height: 12px; margin-left: 8px; vertical-align: -1px;
+    border: 2px solid var(--akzent); border-right-color: transparent; border-radius: 50%; animation: dreh 0.8s linear infinite; }
+  @keyframes dreh { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Bildwerkstatt</h1>
+  <div class="ziel">
+    <div class="umschalter">
+      <button data-modus="projekt">Projekt</button><button data-modus="ablage">Ablage</button>
+    </div>
+    <select id="projekt"></select>
+    <select id="ablagen" hidden></select>
+    <button id="ordner" hidden>Ordner wählen …</button>
+    <span class="pfad" id="zielpfad"></span>
+  </div>
+  <button id="beenden" title="Modelle entladen, ComfyUI beenden, Bildwerkstatt schließen">Beenden</button>
+</header>
+
+<main>
+  <section>
+    <div id="ablage">
+      <div id="hinweis">
+        <p><strong>Bild hier ablegen</strong></p>
+        <p class="leise">Das Original wird in den Zielordner kopiert und nie verändert.</p>
+        <p><button id="waehlen">Datei auswählen …</button></p>
+      </div>
+      <input type="file" id="datei" accept="image/*" hidden>
+    </div>
+    <div class="bildinfo"><span class="pfad" id="bildpfad"></span><span class="leise" id="bildgroesse"></span></div>
+    <div id="verlauf"></div>
+  </section>
+
+  <aside>
+    <div class="karte">
+      <h2>Was soll passieren?</h2>
+      <div class="gruppe"><div class="knoepfe">
+        <button data-schritt="freistellen">Freistellen</button>
+        <button data-schritt="vergroessern" data-faktor="2">Vergrößern ×2</button>
+        <button data-schritt="vergroessern" data-faktor="4">×4</button>
+      </div></div>
+      <div class="gruppe"><span class="leise">Zuschneiden</span><div class="knoepfe">
+        <button data-schritt="zuschneiden" data-format="hero">Hero 16:9</button>
+        <button data-schritt="zuschneiden" data-format="teaser">Teaser 3:2</button>
+        <button data-schritt="zuschneiden" data-format="quadrat">Quadrat 1:1</button>
+        <button data-schritt="zuschneiden" data-format="hoch">Hoch 2:3</button>
+      </div></div>
+      <div class="gruppe"><div class="knoepfe">
+        <button data-schritt="web">Für Web optimieren</button>
+        <button data-schritt="alttext">Alt-Text &amp; Dateiname</button>
+      </div></div>
+      <div class="gruppe">
+        <span class="leise">Oder beschreiben, z. B. „freistellen, quadratisch und fürs Web“</span>
+        <textarea id="text"></textarea>
+        <div class="knoepfe"><button id="planen">Plan erstellen</button></div>
+        <ol id="plan" hidden></ol>
+        <div class="knoepfe"><button id="ausfuehren" class="haupt" hidden>Ausführen</button></div>
+      </div>
+    </div>
+
+    <div class="karte" id="alt">
+      <h2>Alt-Text</h2>
+      <textarea id="alttext" rows="3"></textarea>
+      <div class="knoepfe" style="margin-top:6px"><button id="kopieren">Kopieren</button></div>
+      <p style="margin:12px 0 4px" class="leise">Dateiname (ohne Endung)</p>
+      <input type="text" id="neuname" style="width:100%;margin-bottom:8px">
+      <div class="knoepfe"><button id="umbenennen">Aktuelles Bild so umbenennen</button></div>
+    </div>
+
+    <div class="karte">
+      <h2>Protokoll</h2>
+      <div id="protokoll"><div class="leise">Alles läuft lokal: ComfyUI und LM Studio auf der Grafikkarte.</div></div>
+    </div>
+  </aside>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+const NAMEN = { freistellen: 'Freistellen', vergroessern: 'Vergrößern', zuschneiden: 'Zuschneiden', web: 'Für Web optimieren', alttext: 'Alt-Text & Dateiname' };
+const FORMATNAMEN = { hero: 'Hero 16:9', teaser: 'Teaser 3:2', quadrat: 'Quadrat 1:1', hoch: 'Hoch 2:3' };
+let zustand = { einstellungen: {}, verlauf: [], aktuell: null, plan: null, beschaeftigt: false };
+
+async function api(pfad, daten, headers = {}) {
+  const r = await fetch(pfad, { method: daten === undefined ? 'GET' : 'POST', headers, body: daten instanceof Blob ? daten : daten === undefined ? undefined : JSON.stringify(daten) });
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.fehler || r.statusText);
+  return j;
+}
+
+function log(text, art = '') {
+  const d = document.createElement('div');
+  d.className = art; d.textContent = text;
+  $('#protokoll').prepend(d);
+  return d;
+}
+
+// ---------- Ziel ----------
+function zielZeigen(e, ziel) {
+  zustand.einstellungen = e;
+  document.querySelectorAll('.umschalter button').forEach(b => b.classList.toggle('an', b.dataset.modus === e.modus));
+  $('#projekt').hidden = e.modus !== 'projekt';
+  $('#ablagen').hidden = $('#ordner').hidden = e.modus !== 'ablage';
+  $('#projekt').value = e.projekt;
+  $('#ablagen').innerHTML = e.ablagen.length ? e.ablagen.map(a => `<option>${a}</option>`).join('') : '<option value="">– noch keine Ablage –</option>';
+  $('#ablagen').value = e.ablage;
+  $('#zielpfad').textContent = ziel ? '→ ' + ziel : '';
+}
+
+async function einstellen(e) {
+  try { const r = await api('/api/einstellungen', e); zielZeigen(r.einstellungen, r.ziel); }
+  catch (err) { log(err.message, 'fehler'); }
+}
+
+async function laden() {
+  const s = await api('/api/status');
+  const gruppen = {};
+  s.projekte.forEach(p => (gruppen[p.gruppe] ||= []).push(p));
+  $('#projekt').innerHTML = '<option value="">– Projekt wählen –</option>' + Object.entries(gruppen).map(([g, ps]) =>
+    `<optgroup label="${g}">${ps.map(p => `<option value="${p.kurz}">${p.name} (${p.kurz})</option>`).join('')}</optgroup>`).join('');
+  zielZeigen(s.einstellungen, s.ziel);
+}
+
+document.querySelectorAll('.umschalter button').forEach(b => b.onclick = () => einstellen({ modus: b.dataset.modus }));
+$('#projekt').onchange = e => einstellen({ projekt: e.target.value });
+$('#ablagen').onchange = e => e.target.value && einstellen({ ablage: e.target.value });
+$('#ordner').onclick = async () => {
+  const { ordner } = await api('/api/ordner-waehlen', {});
+  if (ordner) einstellen({ ablage: ordner });
+};
+
+// ---------- Ablegen ----------
+const ablage = $('#ablage');
+ablage.ondragover = e => { e.preventDefault(); ablage.classList.add('drueber'); };
+ablage.ondragleave = () => ablage.classList.remove('drueber');
+ablage.ondrop = e => { e.preventDefault(); ablage.classList.remove('drueber'); if (e.dataTransfer.files[0]) ablegen(e.dataTransfer.files[0]); };
+$('#waehlen').onclick = () => $('#datei').click();
+$('#datei').onchange = e => e.target.files[0] && ablegen(e.target.files[0]);
+
+async function ablegen(datei) {
+  if (!datei.type.startsWith('image/')) return log(`${datei.name} ist kein Bild.`, 'fehler');
+  try {
+    const r = await api('/api/ablegen', datei, { 'X-Dateiname': encodeURIComponent(datei.name) });
+    zustand.verlauf = [{ datei: r.datei, titel: 'Original' }];
+    $('#alt').style.display = 'none';
+    zeigen(0);
+    log(r.neu ? `Original abgelegt: ${r.datei}` : `Original war schon da: ${r.datei}`, 'ok');
+  } catch (err) { log(err.message, 'fehler'); }
+}
+
+async function zeigen(i) {
+  zustand.aktuell = i;
+  const { datei } = zustand.verlauf[i];
+  const r = await fetch('/api/bild?pfad=' + encodeURIComponent(datei));
+  const url = URL.createObjectURL(await r.blob());
+  ablage.innerHTML = `<img src="${url}" alt="">`;
+  $('#bildpfad').textContent = datei;
+  $('#bildgroesse').textContent = (r.headers.get('X-Groesse') || '').replace('x', ' × ') + ' px';
+  verlaufZeigen();
+}
+
+function verlaufZeigen() {
+  $('#verlauf').innerHTML = '';
+  zustand.verlauf.forEach((v, i) => {
+    const f = document.createElement('figure');
+    f.className = i === zustand.aktuell ? 'an' : '';
+    f.innerHTML = `<img src="/api/bild?pfad=${encodeURIComponent(v.datei)}" alt=""><figcaption title="${v.datei}">${v.titel}</figcaption>`;
+    f.onclick = () => zeigen(i);
+    if (i > 0) {
+      const b = document.createElement('button');
+      b.textContent = 'Verwerfen'; b.style.cssText = 'font-size:12px;padding:2px 8px;margin-top:4px';
+      b.onclick = async ev => { ev.stopPropagation(); await verwerfen(i); };
+      f.append(b);
+    }
+    $('#verlauf').append(f);
+  });
+}
+
+async function verwerfen(i) {
+  try {
+    await api('/api/verwerfen', { datei: zustand.verlauf[i].datei });
+    log(`Verworfen: ${zustand.verlauf[i].datei}`);
+    zustand.verlauf.splice(i, 1);
+    zeigen(Math.min(zustand.aktuell, zustand.verlauf.length - 1));
+  } catch (err) { log(err.message, 'fehler'); }
+}
+
+// ---------- Schritte ----------
+function beschaeftigt(an) {
+  zustand.beschaeftigt = an;
+  document.querySelectorAll('aside button, #ablage button').forEach(b => b.disabled = an);
+}
+
+function titel(s) {
+  if (s.schritt === 'vergroessern') return `Vergrößern ×${s.faktor || 2}`;
+  if (s.schritt === 'zuschneiden') return FORMATNAMEN[s.format] || 'Zuschneiden';
+  return NAMEN[s.schritt];
+}
+
+async function ausfuehren(schritte) {
+  if (zustand.aktuell === null) return log('Erst ein Bild ablegen.', 'fehler');
+  beschaeftigt(true);
+  try {
+    for (const s of schritte) {
+      const eingabe = zustand.verlauf[zustand.aktuell].datei;
+      const zeile = log(`${titel(s)} …`, 'laeuft');
+      try {
+        const r = await api('/api/schritt', { datei: eingabe, ...s });
+        zeile.className = 'ok';
+        zeile.textContent = `${titel(s)}: ${r.info} (${r.sekunden} s)` + (r.dateien ? ` → ${r.dateien.length} Dateien in …\\web` : '');
+        if (r.alt) {
+          $('#alt').style.display = 'block';
+          $('#alttext').value = r.alt;
+          $('#neuname').value = r.dateiname;
+        }
+        if (r.datei !== eingabe) { zustand.verlauf.push({ datei: r.datei, titel: titel(s) }); await zeigen(zustand.verlauf.length - 1); }
+      } catch (err) {
+        zeile.className = 'fehler'; zeile.textContent = `${titel(s)}: ${err.message}`;
+        break;
+      }
+    }
+  } finally { beschaeftigt(false); }
+}
+
+document.querySelectorAll('[data-schritt]').forEach(b => b.onclick = () =>
+  ausfuehren([{ schritt: b.dataset.schritt, format: b.dataset.format || '', faktor: Number(b.dataset.faktor || 0) }]));
+
+$('#planen').onclick = async () => {
+  const text = $('#text').value.trim();
+  if (!text) return;
+  beschaeftigt(true);
+  const zeile = log('Sprachmodell plant …', 'laeuft');
+  try {
+    const p = await api('/api/plan', { text });
+    zeile.className = 'ok'; zeile.textContent = `Plan: ${p.schritte.length} Schritte`;
+    zustand.plan = p.schritte;
+    $('#plan').innerHTML = p.schritte.map(s => `<li>${titel(s)}</li>`).join('') + (p.hinweis ? `<li class="leise" style="list-style:none;margin-left:-22px">${p.hinweis}</li>` : '');
+    $('#plan').hidden = false;
+    $('#ausfuehren').hidden = p.schritte.length === 0;
+  } catch (err) { zeile.className = 'fehler'; zeile.textContent = err.message; }
+  finally { beschaeftigt(false); }
+};
+$('#ausfuehren').onclick = () => zustand.plan && ausfuehren(zustand.plan);
+
+$('#kopieren').onclick = () => navigator.clipboard.writeText($('#alttext').value).then(() => log('Alt-Text kopiert', 'ok'));
+$('#umbenennen').onclick = async () => {
+  const v = zustand.verlauf[zustand.aktuell];
+  try {
+    const r = await api('/api/umbenennen', { datei: v.datei, name: $('#neuname').value });
+    log(`Umbenannt: ${r.datei}`, 'ok');
+    v.datei = r.datei; zeigen(zustand.aktuell);
+  } catch (err) { log(err.message, 'fehler'); }
+};
+
+$('#beenden').onclick = async () => {
+  $('#beenden').disabled = true;
+  log('Beende …', 'laeuft');
+  await api('/api/beenden', {}).catch(() => {});
+  document.body.innerHTML = '<p style="padding:40px">Bildwerkstatt beendet. Dieses Fenster kann geschlossen werden.</p>';
+};
+
+laden().catch(err => log(err.message, 'fehler'));
+</script>
+</body>
+</html>

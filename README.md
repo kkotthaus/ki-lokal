@@ -41,11 +41,21 @@ Prüfen bei laufendem ComfyUI: `curl.exe http://127.0.0.1:8188/models/checkpoint
 | Modell | Ordner | Download |
 |---|---|---|
 | FLUX.1 schnell fp8 (Apache 2.0) | `ComfyUI\models\checkpoints` | https://huggingface.co/Comfy-Org/flux1-schnell |
-| RMBG-2.0 / BiRefNet | lädt ComfyUI-RMBG selbst | https://github.com/1038lab/ComfyUI-RMBG |
+| BiRefNet (MIT) | `ComfyUI\models\background_removal` | https://huggingface.co/Comfy-Org/BiRefNet |
+| Real-ESRGAN x4plus (BSD-3) | `ComfyUI\models\upscale_models` | https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth |
+| Qwen3.5 9B mit Bilderkennung (Apache 2.0) | LM Studio | `lms get qwen/qwen3.5-9b` |
 
 ## Werkzeuge
 
-- `scripts/optimize-images.mjs` – Bilder in AVIF + WebP, 640/1280/1920 px
+- `app/` – **Bildwerkstatt**: Bild per Drag & Drop ablegen, dann per Knopf oder freiem Text
+  freistellen, vergrößern, zuschneiden, fürs Web optimieren, Alt-Text und Dateinamen vorschlagen.
+  Alles lokal auf der Grafikkarte (ComfyUI, LM Studio). Start: Verknüpfung „Bildwerkstatt“ auf dem
+  Desktop bzw. `app\start.ps1` (http://127.0.0.1:8190), Beenden über den Knopf in der Oberfläche.
+  Ziel ist ein Projekt (`medien\raw\<projekt>`) oder eine frei gewählte Ablage; die Wahl wird in
+  `%LOCALAPPDATA%\ki-lokal\bildwerkstatt.json` gemerkt. Das Original wird nur kopiert, nie verändert.
+  Auf der Grafikkarte liegt immer nur ein Modell: vor ComfyUI wird das Sprachmodell entladen und umgekehrt.
+- `scripts/optimize-images.mjs` – Bilder in AVIF + WebP, 640/1280/1920 px (Kern in `scripts/bilder-web.mjs`)
+- `scripts/comfy/remove_bg.py` – freistellen, `scripts/comfy/upscale_api.json` – vergrößern mit Real-ESRGAN
 - `scripts/comfy/` – ComfyUI-Workflows (API-Export) und Skripte dafür
 - `scripts/comfy/generate.py` – Text-zu-Bild mit FLUX.1 schnell über die ComfyUI-API,
   speichert nach `medien\raw\<name>-<nummer>.png`
