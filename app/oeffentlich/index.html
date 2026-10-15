@@ -63,6 +63,12 @@
   .malen { display: none; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
   .malen.an { display: flex; }
   #wunsch { min-height: 140px; font-size: 16px; }
+  .farbquelle { display: flex; gap: 8px; }
+  .farbquelle input { flex: 1; min-width: 0; }
+  #farbfelder { display: flex; flex-wrap: wrap; gap: 6px; }
+  #farbfelder button { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px 3px 4px; font-size: 12px; opacity: .45; }
+  #farbfelder button.an { opacity: 1; border-color: var(--akzent); }
+  #farbfelder i { width: 18px; height: 18px; border-radius: 4px; border: 1px solid var(--linie); }
   @keyframes dreh { to { transform: rotate(360deg); } }
 </style>
 </head>
@@ -106,12 +112,18 @@
       <h2>Neu erstellen</h2>
       <div class="gruppe">
         <textarea id="wunsch" placeholder="z. B. „Erstelle ein SVG, das einen Handball darstellt“ oder „Foto: heller Bauernhofladen mit Gemüsekisten, Querformat“"></textarea>
+        <div class="farbquelle">
+          <input type="text" id="farbquelle" placeholder="Farben von Website, z. B. https://paas.local">
+          <button id="farbenHolen">Farben holen</button>
+        </div>
+        <div id="farbfelder"></div>
         <div class="knoepfe">
           <select id="art" title="Art"><option value="auto">Art: automatisch</option><option value="bild">Bild (PNG)</option><option value="svg">SVG (Icon, Grafik)</option></select>
           <select id="format" title="Format"><option value="auto">Format: automatisch</option><option value="quadrat">Quadrat 1:1</option><option value="hero">Hero 16:9</option><option value="teaser">Teaser 3:2</option><option value="hoch">Hoch 2:3</option></select>
           <button id="erstellen" class="haupt">Erstellen</button>
         </div>
-        <span class="leise">Jeder Klick ergibt eine neue Variante. SVG: flache Grafik, nachgezeichnet aus einem KI-Bild.</span>
+        <span class="leise">Jeder Klick ergibt eine neue Variante. SVG: flache Grafik, nachgezeichnet aus einem KI-Bild.
+          Gewählte Farben: im SVG exakt, im Bild ungefähr.</span>
       </div>
     </div>
 
@@ -177,7 +189,7 @@
 const $ = s => document.querySelector(s);
 const NAMEN = { freistellen: 'Freistellen', vergroessern: 'Vergrößern', zuschneiden: 'Zuschneiden', schwarzweiss: 'Schwarzweiß', entfernen: 'Entfernen', web: 'Für Web optimieren', alttext: 'Alt-Text & Dateiname' };
 const FORMATNAMEN = { hero: 'Hero 16:9', teaser: 'Teaser 3:2', quadrat: 'Quadrat 1:1', hoch: 'Hoch 2:3' };
-let zustand = { einstellungen: {}, verlauf: [], aktuell: null, plan: null, beschaeftigt: false };
+let zustand = { einstellungen: {}, verlauf: [], aktuell: null, plan: null, beschaeftigt: false, projekte: [], farben: [], farbquelleAuto: '' };
 
 async function api(pfad, daten, headers = {}) {
   const r = await fetch(pfad, { method: daten === undefined ? 'GET' : 'POST', headers: { 'X-Bildwerkstatt': '1', ...headers }, body: daten instanceof Blob ? daten : daten === undefined ? undefined : JSON.stringify(daten) });
@@ -204,6 +216,10 @@ function zielZeigen(e, ziel) {
   $('#ablagen').innerHTML = e.ablagen.length ? e.ablagen.map(a => `<option>${a}</option>`).join('') : '<option value="">– noch keine Ablage –</option>';
   $('#ablagen').value = e.ablage;
   $('#zielpfad').textContent = ziel ? '→ ' + ziel : '';
+  // Website des Projekts als Farbquelle vorschlagen (eigene Eingaben nicht überschreiben)
+  const seite = e.modus === 'projekt' ? zustand.projekte.find(p => p.kurz === e.projekt)?.seite || '' : '';
+  if (!$('#farbquelle').value || $('#farbquelle').value === zustand.farbquelleAuto) $('#farbquelle').value = seite;
+  zustand.farbquelleAuto = seite;
 }
 
 async function einstellen(e) {
@@ -218,6 +234,7 @@ async function laden() {
   $('#projekt').innerHTML = '<option value="">– Projekt wählen –</option>' + Object.entries(gruppen).map(([g, ps]) =>
     `<optgroup label="${g}">${ps.map(p => `<option value="${p.kurz}">${p.name} (${p.kurz})</option>`).join('')}</optgroup>`).join('');
   zustand.fern = s.fern;
+  zustand.projekte = s.projekte;
   $('#beenden').hidden = s.fern;
   if (s.netzwerk) {
     // Am Rechner selbst: so kommt der andere Arbeitsplatz hin
@@ -364,15 +381,42 @@ $('#planen').onclick = async () => {
 };
 $('#ausfuehren').onclick = () => zustand.plan && ausfuehren(zustand.plan);
 
+// ---------- Farben von einer Website ----------
+function farbenZeigen() {
+  $('#farbfelder').innerHTML = '';
+  zustand.farben.forEach(f => {
+    const b = document.createElement('button');
+    b.className = f.an ? 'an' : '';
+    b.title = (f.an ? 'Wird verwendet' : 'Wird nicht verwendet') + ' – klicken zum Umschalten';
+    b.innerHTML = `<i style="background:${f.hex}"></i>${f.name ? f.name + ' ' : ''}<code>${f.hex}</code>`;
+    b.onclick = () => { f.an = !f.an; farbenZeigen(); };
+    $('#farbfelder').append(b);
+  });
+}
+$('#farbenHolen').onclick = async () => {
+  const url = $('#farbquelle').value.trim();
+  if (!url) { zustand.farben = []; return farbenZeigen(); }
+  const zeile = log(`Farben von ${url} …`, 'laeuft');
+  try {
+    const r = await api('/api/farben', { url });
+    zustand.farben = r.farben.map(f => ({ ...f, an: f.haupt }));
+    if (!zustand.farben.some(f => f.an)) zustand.farben.slice(0, 3).forEach(f => (f.an = true));
+    farbenZeigen();
+    zeile.className = 'ok'; zeile.textContent = `${r.farben.length} Farben von ${r.url}`;
+  } catch (err) { zeile.className = 'fehler'; zeile.textContent = `Farben: ${err.message}`; }
+};
+$('#farbquelle').onkeydown = e => { if (e.key === 'Enter') $('#farbenHolen').click(); };
+
 $('#erstellen').onclick = async () => {
   const text = $('#wunsch').value.trim();
   if (!text) return log('Erst beschreiben, was entstehen soll.', 'fehler');
   beschaeftigt(true);
   const zeile = log('Erstelle … (Sprachmodell, dann FLUX)', 'laeuft');
   try {
-    const r = await api('/api/erstellen', { text, art: $('#art').value, format: $('#format').value });
+    const farben = zustand.farben.filter(f => f.an).map(({ hex, name }) => ({ hex, name }));
+    const r = await api('/api/erstellen', { text, art: $('#art').value, format: $('#format').value, farben });
     zeile.className = 'ok';
-    zeile.textContent = `Erstellt als ${r.art === 'svg' ? 'SVG' : 'Bild'}, ${FORMATNAMEN[r.format]} (${r.sekunden} s)`;
+    zeile.textContent = `Erstellt als ${r.art === 'svg' ? 'SVG' : 'Bild'}, ${FORMATNAMEN[r.format]}` + (farben.length ? `, Farben ${farben.map(f => f.hex).join(' ')}` : '') + ` (${r.sekunden} s)`;
     log(`Prompt: ${r.prompt}`, 'leise');
     zustand.verlauf = r.ergebnisse;
     $('#alt').style.display = 'none';

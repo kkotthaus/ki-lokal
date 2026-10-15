@@ -128,7 +128,8 @@ dateiname: 2 bis 5 deutsche Wörter in Kleinbuchstaben mit Bindestrich, ohne Uml
 }
 
 // Wunsch für ein neues Bild in einen englischen FLUX-Prompt übersetzen; Art und Format nur, wenn nicht vorgegeben.
-export async function entwurf(text, art = 'auto', format = 'auto') {
+// farben: [{ hex, name }] – Vorgabe, z. B. von der Website des Projekts
+export async function entwurf(text, art = 'auto', format = 'auto', farben = []) {
   const schema = {
     type: 'object',
     properties: {
@@ -146,13 +147,18 @@ export async function entwurf(text, art = 'auto', format = 'auto') {
 - motiv: das Motiv als englische Bildbeschreibung, 15 bis 60 Wörter, konkret (Gegenstand, Farben, Licht, Umgebung).
   Bei svg nur der Gegenstand selbst: seine Formen und 2 bis 4 klare Farben, ohne Hintergrund, Licht, Schatten oder Schattierung.
   Keine echten Personen, keine Marken oder Logos fremder Firmen, kein Text im Bild, außer der Nutzer verlangt ihn.
-- dateiname: 2 bis 4 deutsche Wörter in Kleinbuchstaben mit Bindestrich, ohne Umlaute, ohne Endung.`;
+- dateiname: 2 bis 4 deutsche Wörter in Kleinbuchstaben mit Bindestrich, ohne Umlaute, ohne Endung.`
+    + (farben.length ? `
+- Farbvorgabe: Verwende im Motiv nur diese Farben (dazu Weiß oder Schwarz, wo nötig) und nenne sie mit
+  englischen Farbwörtern und Hexwert, z. B. "deep wine red (#6b1c23)": ${farben.map(f => f.hex).join(', ')}.` : '');
   const a = await frage([{ role: 'system', content: system }, { role: 'user', content: text }], schema);
   if (art !== 'auto') a.art = art;
   if (FORMATE.includes(format)) a.format = format;
   a.prompt = a.art === 'svg'
     ? `Minimalist flat vector icon: ${a.motiv.replace(/\.$/, '')}. Large, filling most of the frame, centered. Simple geometric shapes, 2 to 4 solid flat colors, uniform bold dark outlines, no gradients, no shading, no highlights, no shadow, no text, isolated on a plain pure white background.`
     : a.motiv;
+  // Farbvorgabe immer mitgeben, auch wenn das Sprachmodell sie im Motiv vergisst
+  if (farben.length) a.prompt += ` Color palette: only ${farben.map(f => f.hex).join(', ')}${a.art === 'svg' ? ' and white' : ''}.`;
   a.dateiname = a.dateiname.toLowerCase()
     .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
     .replace(/[^a-z0-9]+/g, '-').replace(/-(svg|png|jpe?g|bild|datei)$/, '').replace(/^-|-$/g, '') || 'grafik';

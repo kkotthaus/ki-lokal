@@ -13,6 +13,7 @@ import * as comfy from './lib/comfy.mjs';
 import * as sprachmodell from './lib/sprachmodell.mjs';
 import { webVarianten } from '../scripts/bilder-web.mjs';
 import * as zugang from './lib/zugang.mjs';
+import * as farben from './lib/farben.mjs';
 
 const PORT = 8190;
 const OEFFENTLICH = path.join(KI_LOKAL, 'app', 'oeffentlich');
@@ -33,7 +34,9 @@ async function speichern() {
 async function projekte() {
   try {
     const d = JSON.parse(await readFile(path.join(PROJEKTE, 'windows-dev', 'projekte.json'), 'utf8'));
-    return d.projekte.map(p => ({ kurz: p.kurz, name: p.name, gruppe: p.gruppe || '' }));
+    // seite: Adresse für „Farben von“ – die lokale Seite, sonst Staging oder Live
+    const seite = p => ['Lokal', 'Staging', 'Live'].map(u => (p.seiten || []).find(s => s.umgebung === u)?.adresse).find(Boolean) || '';
+    return d.projekte.map(p => ({ kurz: p.kurz, name: p.name, gruppe: p.gruppe || '', seite: seite(p) }));
   } catch { return []; }
 }
 
@@ -74,12 +77,14 @@ function python(skript, args) {
 }
 
 // ---------- Neu erstellen: Text → Bild (FLUX), bei SVG weiter nachzeichnen ----------
-async function erstellen({ text, art = 'auto', format = 'auto' }) {
+async function erstellen({ text, art = 'auto', format = 'auto', farben: vorgabe = [] }) {
   if (!String(text || '').trim()) throw new Error('Bitte beschreiben, was entstehen soll.');
   const ordner = zielordner();
   await mkdir(ordner, { recursive: true });
   await fuerSprachmodell();
-  const e = await sprachmodell.entwurf(text, art, format);
+  // Farbvorgabe nur als saubere Hexwerte annehmen (gehen in Prompt und Kommandozeile)
+  vorgabe = (Array.isArray(vorgabe) ? vorgabe : []).filter(f => /^#[0-9a-f]{6}$/i.test(f?.hex)).slice(0, 8);
+  const e = await sprachmodell.entwurf(text, art, format, vorgabe);
   await fuerComfy();
   const [w, h] = FLUX[e.format];
   const bild = await freierName(ordner, e.dateiname, '.png');
@@ -88,7 +93,8 @@ async function erstellen({ text, art = 'auto', format = 'auto' }) {
   if (e.art === 'svg') {
     // Weißer Hintergrund fällt beim Nachzeichnen weg (vom Rand aus, weiße Flächen im Motiv bleiben)
     const svg = await freierName(ordner, path.parse(bild).name, '.svg');
-    await python(['vektor', 'svg.py'], ['--bild', bild, '--aus', svg]);
+    const palette = vorgabe.length ? ['--palette', vorgabe.map(f => f.hex).join(',')] : [];
+    await python(['vektor', 'svg.py'], ['--bild', bild, '--aus', svg, ...palette]);
     ergebnisse.push({ datei: svg, titel: 'SVG' });
   }
   ergebnisse.forEach(r => angelegt.add(r.datei));
@@ -275,6 +281,9 @@ const routen = {
     await fuerSprachmodell();
     return sprachmodell.plan(JSON.parse(b).text);
   }),
+
+  // Farben einer Website (auch *.local) auslesen
+  'POST /api/farben': async (_, b) => farben.vonWebsite(String(JSON.parse(b).url || '').trim()),
 
   'POST /api/erstellen': (_, b) => nacheinander(async () => {
     const start = Date.now();

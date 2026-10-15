@@ -59,6 +59,10 @@ angeben; verbindlich klärt das nur eine juristische Prüfung.
 - `app/` – **Bildwerkstatt**: **Neu erstellen** nach Beschreibung („Erstelle ein SVG, das einen Handball darstellt“):
   das Sprachmodell wählt Art (Bild/SVG) und Format und schreibt den englischen Prompt, FLUX erzeugt das Bild;
   bei SVG wird es nachgezeichnet (`scripts/vektor/svg.py`), mit Knopf „SVG-Code kopieren“. Jeder Klick ergibt eine neue Variante.
+  **Farben von einer Website** (`app/lib/farben.mjs`): Adresse eingeben (auch Local-Seiten wie https://paas.local, die
+  Bildwerkstatt fragt sie am Platz 1 ab; bei Projekten wird die Seite aus `windows-dev/projekte.json` vorgeschlagen).
+  Gelesen werden theme-color, Hauptfarben als CSS-Variablen (ACSS `--primary` usw., WordPress-Palette) und häufige Farben.
+  Gewählte Farben gehen in den Prompt (Bild: ungefähr) und werden im SVG exakt gesetzt (`svg.py --palette`).
   Oder ein Bild per Drag & Drop ablegen, dann per Knopf oder freiem Text
   freistellen, Inhalte entfernen (markieren mit dem Pinsel), vergrößern, zuschneiden, aufhellen,
   schwarzweiß, fürs Web optimieren, Alt-Text und

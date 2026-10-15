@@ -66,11 +66,23 @@ def farben(rgb, anzahl, abstand=60):
     return nummern.reshape(rgb.shape[:2]), pal
 
 
+def auf_palette(pal, vorgabe):
+    """Jede Farbe durch die ähnlichste der Vorgabe ersetzen (Abstand nach Wahrnehmung, „redmean“)."""
+    ziel = [tuple(bytes.fromhex(h.strip().lstrip("#")[:6])) for h in vorgabe.split(",") if h.strip()]
+    ziel = np.array(ziel + [(255, 255, 255), (0, 0, 0)], dtype=float)
+    def ab(c, z):
+        r = (c[0] + z[:, 0]) / 2
+        d = z - c
+        return np.sqrt((2 + r / 256) * d[:, 0] ** 2 + 4 * d[:, 1] ** 2 + (2 + (255 - r) / 256) * d[:, 2] ** 2)
+    return np.array([ziel[ab(c, ziel).argmin()] for c in pal])
+
+
 def main():
     p = argparse.ArgumentParser(description="Bild in SVG umwandeln")
     p.add_argument("--bild", required=True)
     p.add_argument("--aus", required=True)
     p.add_argument("--farben", type=int, default=6, help="höchstens so viele Farben (ohne Transparenz)")
+    p.add_argument("--palette", default="", help="exakte Farben, z. B. \"#6b1c23,#ec9b52\": jede Fläche bekommt die nächste davon (Weiß und Schwarz bleiben erlaubt)")
     a = p.parse_args()
 
     bild = Image.open(a.bild).convert("RGBA")
@@ -96,6 +108,8 @@ def main():
     # danach Flächenränder glätten, sonst zeichnet vtracer jede Pixeltreppe nach
     # (geglättet auf den Farbnummern – auf RGB arbeitet der Filter je Kanal und mischt neue Farben)
     nummern, pal = farben(np.array(bild.convert("RGB")), a.farben)
+    if a.palette:
+        pal = auf_palette(pal, a.palette)
     nummern = np.array(Image.fromarray(nummern.astype(np.uint8)).filter(ImageFilter.ModeFilter(7)))
     # Transparenz als eigene, im Bild nicht vorkommende Farbe; deren Pfade fallen danach weg
     # (vtracers eigene Behandlung transparenter Pixel verfälscht dunkle Flächen)
@@ -119,6 +133,12 @@ def main():
         f = re.search(r'fill="#([0-9A-Fa-f]{6})"', m.group(0))
         return "" if f and np.linalg.norm(np.array(list(bytes.fromhex(f.group(1)))) - np.array(leer)) < 24 else m.group(0)
     svg = re.sub(r'<path[^>]*/>\s*', leer_pfad, svg)
+    if a.palette:
+        # vtracer mittelt Farben leicht (z. B. #303234 statt #2f3234): Füllungen wieder auf die exakte Vorgabe setzen
+        def exakt(m):
+            rgb = np.array(list(bytes.fromhex(m.group(1))), dtype=float)
+            return 'fill="#%02x%02x%02x"' % tuple(int(v) for v in auf_palette([rgb], a.palette)[0])
+        svg = re.sub(r'fill="#([0-9A-Fa-f]{6})"', exakt, svg)
     # Feste Größe durch viewBox ersetzen, damit die Grafik frei skaliert
     w, h = fertig.size
     svg = re.sub(r'<svg[^>]*>', f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}">', svg, count=1)
