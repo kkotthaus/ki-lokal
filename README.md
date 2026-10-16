@@ -93,6 +93,9 @@ angeben; verbindlich klärt das nur eine juristische Prüfung.
 - `scripts/comfy/` – ComfyUI-Workflows (API-Export) und Skripte dafür
 - `scripts/comfy/generate.py` – Text-zu-Bild mit FLUX.1 schnell über die ComfyUI-API,
   speichert nach `medien\raw\<name>-<nummer>.png`
+- `scripts/comfy/img2img.py` – Bild-zu-Bild mit FLUX.1 schnell: eine Vorlage (z. B. eigene Skizze) gibt den Aufbau vor,
+  der Prompt den Stil; `--staerke` 0.4 (nah an der Vorlage) bis 0.8 (frei). Hilft nur begrenzt: bei hoher Stärke setzt
+  FLUX sein eigenes Bild durch (ein Rehbock-Gehörn gelang so nicht).
 - `scripts/blender/` – Blender-Python-Skripte
 - `vorlagen/webprojekt/` – CLAUDE.md für neue Webprojekte
 
