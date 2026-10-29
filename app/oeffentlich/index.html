@@ -341,7 +341,8 @@ document.addEventListener('paste', e => {
 });
 // Knopf: liest die Zwischenablage direkt (der Browser fragt beim ersten Mal nach der Erlaubnis; nur am Rechner selbst)
 $('#einfuegen').onclick = async () => {
-  if (!navigator.clipboard?.read || !window.isSecureContext) return log('Hier bitte mit Strg+V einfügen (der Knopf geht nur am Rechner selbst).', 'fehler');
+  // Über http:// im Netz nur mit der Browser-Richtlinie aus Arbeitsplaetze\einrichten.ps1
+  if (!navigator.clipboard?.read || !window.isSecureContext) return log('Hier bitte mit Strg+V einfügen. Für den Knopf am anderen Arbeitsplatz einmal Arbeitsplaetze\\einrichten.ps1 laufen lassen und den Browser neu starten.', 'fehler');
   try {
     for (const item of await navigator.clipboard.read()) {
       const typ = item.types.find(t => t.startsWith('image/'));
