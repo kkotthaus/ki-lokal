@@ -6,6 +6,7 @@ Hier liegen Workflows im API-Format (ComfyUI: Menü > Workflow > Export (API)).
 |---|---|
 | flux_api.json | Text-zu-Bild mit FLUX.1 schnell |
 | rmbg_api.json | Hintergrund entfernen mit BiRefNet (Kernknoten von ComfyUI, wie Vorlage „Remove Background (BiRefNet)“) |
+| upscale_api.json | Vergrößern mit RealESRGAN x4 (`models/upscale_models/RealESRGAN_x4plus.pth`) |
 
 ## start.ps1 / stop.ps1
 
@@ -68,3 +69,13 @@ python scripts/comfy/remove_bg.py --src bild.png --out D:/Projekte-KI/medien/raw
 | `--out` | (Pflicht) | Zielordner |
 | `--name` | `<eingabe>-freigestellt` | Dateiname ohne Endung |
 | `--server` | http://127.0.0.1:8188 | ComfyUI-API |
+
+## upscale.py
+
+Vergrößert ein Bild mit `upscale_api.json` (RealESRGAN x4, danach optional mit `--faktor`
+skaliert) und speichert es als PNG. Vorhandene Dateien werden nie überschrieben.
+Nur Python-Standardbibliothek. Gut vor dem Freistellen kleiner Fotos (z. B. aus WhatsApp).
+
+```powershell
+python scripts/comfy/upscale.py --src foto.jpg --out D:/Projekte-KI/medien/raw/<projekt> --faktor 0.5
+```
