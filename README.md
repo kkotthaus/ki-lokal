@@ -76,6 +76,10 @@ angeben; verbindlich klärt das nur eine juristische Prüfung.
   Desktop bzw. `app\start.ps1` (http://127.0.0.1:8190), Beenden über den Knopf in der Oberfläche.
   Ziel ist ein Projekt (`medien\raw\<projekt>`) oder eine frei gewählte Ablage; die Wahl wird in
   `%LOCALAPPDATA%\ki-lokal\bildwerkstatt.json` gemerkt. Das Original wird nur kopiert, nie verändert.
+  Die Karten rechts und die Gruppen unter „Was soll passieren?“ lassen sich am Griff ⠿ verschieben, Karten per
+  Klick auf die Überschrift auf- und zuklappen. Haken beim Alt-Text: nach dem Kopieren die Fläche leeren, um gleich
+  mit dem nächsten Bild weiterzumachen. All das wird dort je Arbeitsplatz gemerkt (am Rechner selbst bzw. je
+  IP-Adresse); „Anordnung zurücksetzen“ stellt den Standard her.
   Auf der Grafikkarte liegt immer nur ein Modell: vor ComfyUI wird das Sprachmodell entladen und umgekehrt.
   **Vom anderen Arbeitsplatz:** In den Einstellungen `"netzwerk": true` und unter `"rechner"` die erlaubten
   IP-Adressen (Platz 2: 192.168.110.51). Dann erreichbar unter http://192.168.110.50:8190, beim ersten Mal mit

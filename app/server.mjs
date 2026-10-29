@@ -15,17 +15,23 @@ import { webVarianten } from '../scripts/bilder-web.mjs';
 import * as zugang from './lib/zugang.mjs';
 import * as farben from './lib/farben.mjs';
 
-const PORT = 8190;
+const PORT = Number(process.env.BILDWERKSTATT_PORT) || 8190;  // anderer Port z. B. für eine Testinstanz
 const OEFFENTLICH = path.join(KI_LOKAL, 'app', 'oeffentlich');
 const FORMATE = { hero: [16, 9], teaser: [3, 2], quadrat: [1, 1], hoch: [2, 3] };
 // Bildgrößen für FLUX je Format (Vielfache von 64, um 1 Megapixel)
 const FLUX = { hero: [1344, 768], teaser: [1216, 832], quadrat: [1024, 1024], hoch: [832, 1216] };
 
 // ---------- Einstellungen (gemerkt in %LOCALAPPDATA%\ki-lokal\bildwerkstatt.json) ----------
-const STANDARD = { modus: 'projekt', projekt: '', ablage: '', ablagen: [], modell: 'qwen/qwen3.5-9b', netzwerk: false, rechner: [] };
+const STANDARD = { modus: 'projekt', projekt: '', ablage: '', ablagen: [], modell: 'qwen/qwen3.5-9b', netzwerk: false, rechner: [], ansicht: {} };
 // netzwerk: auch im Netz erreichbar; rechner: IP-Adressen, die zugreifen dürfen (leer = keiner von außen)
+// ansicht: Anordnung der Oberfläche je Arbeitsplatz ("lokal" bzw. IP-Adresse): Reihenfolge der Karten und der
+// Gruppen unter „Was soll passieren?“, zugeklappte Karten, Haken „nach dem Kopieren des Alt-Texts Fläche leeren“
 let einstellungen = { ...STANDARD };
 try { einstellungen = { ...STANDARD, ...JSON.parse(await readFile(EINSTELLUNGEN, 'utf8')) }; } catch { /* erster Start */ }
+// Arbeitsplatz einer Anfrage: am Rechner selbst "lokal", sonst die IP-Adresse (z. B. Platz 2)
+function arbeitsplatz(req) {
+  return zugang.lokal(req) ? 'lokal' : (req.socket.remoteAddress || '').replace(/^::ffff:/, '');
+}
 async function speichern() {
   await mkdir(STATUS, { recursive: true });
   await writeFile(EINSTELLUNGEN, JSON.stringify(einstellungen, null, 2));
@@ -328,7 +334,25 @@ const routen = {
     fern: !zugang.lokal(req),
     // Nur am Rechner selbst: Adresse und Schlüssel für den Zugriff vom anderen Arbeitsplatz
     netzwerk: einstellungen.netzwerk && zugang.lokal(req) ? { adresse: `http://${eigeneAdresse()}:${PORT}`, schluessel: SCHLUESSEL } : null,
+    ansicht: einstellungen.ansicht[arbeitsplatz(req)] || {},
   }),
+
+  // Ansicht merken, für jeden Arbeitsplatz eigen; nur die mitgeschickten Teile ändern sich (leere Liste = Standard)
+  'POST /api/ansicht': async (req, b) => {
+    const e = JSON.parse(b);
+    const liste = v => Array.isArray(v) && v.length <= 30 && v.every(id => typeof id === 'string' && /^[a-z0-9-]{1,30}$/.test(id));
+    const platz = arbeitsplatz(req);
+    const a = { ...(einstellungen.ansicht[platz] || {}) };
+    for (const k of ['karten', 'gruppen', 'zu']) {
+      if (e[k] === undefined) continue;
+      if (!liste(e[k])) throw new Error('Ungültige Ansicht.');
+      if (e[k].length) a[k] = e[k]; else delete a[k];
+    }
+    if (e.altLeeren !== undefined) a.altLeeren = Boolean(e.altLeeren);
+    einstellungen.ansicht[platz] = a;
+    await speichern();
+    return { ansicht: a };
+  },
 
   'POST /api/einstellungen': async (req, b) => {
     const e = JSON.parse(b);
